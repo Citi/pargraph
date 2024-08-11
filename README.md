@@ -3,7 +3,7 @@
     <img src="https://github.com/citi.png" alt="Citi" width="80" height="80">
   </a>
 
-  <h3 align="center">Citi/paragraph</h3>
+  <h3 align="center">Citi/pargraph</h3>
 
   <p align="center">
     Efficient, lightweight and reliable distributed computation engine.
