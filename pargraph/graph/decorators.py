@@ -6,7 +6,7 @@ import operator
 import uuid
 import warnings
 from dataclasses import dataclass
-from typing import Any, Callable, Optional, Protocol, Tuple, Union
+from typing import Any, Callable, Optional, Protocol, Tuple, Union, cast
 
 from pargraph.graph.annotation import _get_output_names
 from pargraph.graph.objects import (
@@ -67,7 +67,7 @@ class GraphContext:
             return getattr(self, item)
 
         _getattr.__name__ = "getattr"
-        return delayed(_getattr)(self, item)
+        return _implicit_delayed(_getattr)(self, item)
 
     def __call__(self, *args, **kwargs):
         warnings.warn(
@@ -77,7 +77,7 @@ class GraphContext:
 
         @delayed
         def call(*args) -> Any:
-            func, arg_length, *args = args
+            func, arg_length, *args = args  # type: ignore[assignment]
             positional_args = args[:arg_length]
             keyword_args = args[arg_length:]
             return func(*positional_args, **dict(zip(keyword_args[0::2], keyword_args[1::2])))
@@ -98,12 +98,14 @@ def graph(function: Callable) -> Graphable:
     """
     Graph decorator
 
-    Assumptions:
+    .. note::
 
-    - The function must have a return annotation
-    - Variadic positional and/or keyword arguments are not supported
-    - Function must not have any side effects
-    - Function must be comprised of other graph or delayed functions
+        There are a few assumptions when decorating a function with the graph decorator:
+
+        - The function must have a return annotation
+        - Variadic positional and/or keyword arguments are not supported
+        - Function must not have any side effects
+        - Function must be comprised of other graph or delayed functions
 
     :param function: function to decorate
     :return: decorated function
@@ -115,23 +117,25 @@ def graph(function: Callable) -> Graphable:
 
     @functools.wraps(function)
     def wrapper(*args, **kwargs) -> Union[Graph, GraphContext, Tuple[GraphContext, ...], Any]:
-        # If all arguments are not GraphContext, compute function directly
-        if all(not isinstance(arg, GraphContext) for arg in itertools.chain(args, kwargs.values())):
-            return function(*args, **kwargs)
-
         # Bind arguments to handle for positional arguments
         bound_args = inspect.signature(function).bind(*args, **kwargs)
+
+        # If all arguments are not GraphContext, compute function directly
+        if all(not isinstance(arg, GraphContext) for arg in bound_args.arguments.values()):
+            return function(*args, **kwargs)
 
         # Generate graph context
         # NOTE: Pass a graph context with only one input for each arg so that it is merged into the graph downstream
         graph_result = function(
             **{
-                name: GraphContext(
-                    _graph=Graph(consts={}, inputs={InputKey(key=name): None}, nodes={}, outputs={}),
-                    _target=InputKey(key=name),
+                name: (
+                    GraphContext(
+                        _graph=Graph(consts={}, inputs={InputKey(key=name): None}, nodes={}, outputs={}),
+                        _target=InputKey(key=name),
+                    )
+                    if isinstance(arg, GraphContext)
+                    else arg
                 )
-                if isinstance(arg, GraphContext)
-                else arg
                 for name, arg in bound_args.arguments.items()
             }
         )
@@ -157,22 +161,18 @@ def graph(function: Callable) -> Graphable:
         )
 
         # Short circuit if external input is passed in (for top-level graph calls)
-        if any(arg._target is None for arg in itertools.chain(args, kwargs.values()) if isinstance(arg, GraphContext)):
+        if any(arg._target is None for arg in bound_args.arguments.values() if isinstance(arg, GraphContext)):
             return sub_graph
 
         # Inject sub graph into parent graph
         node_id = f"{function.__name__}_{uuid.uuid4().hex}"
         parent_graph = _merge_graphs(
-            *(arg._graph for arg in itertools.chain(args, kwargs.values()) if isinstance(arg, GraphContext))
+            *(arg._graph for arg in bound_args.arguments.values() if isinstance(arg, GraphContext))
         )
         parent_graph.nodes[NodeKey(key=node_id)] = GraphCall(
             graph=sub_graph,
             graph_name=function.__name__,
-            args={
-                str(name): arg._target
-                for name, arg in itertools.chain(enumerate(args), kwargs.items())
-                if isinstance(arg, GraphContext)
-            },
+            args={name: arg._target for name, arg in bound_args.arguments.items() if isinstance(arg, GraphContext)},
         )
 
         return (
@@ -185,22 +185,24 @@ def graph(function: Callable) -> Graphable:
         )
 
     def to_graph(*args, **kwargs):
-        return generate_graph(wrapper, *args, **kwargs)
+        return _generate_graph(wrapper, *args, **kwargs)
 
-    wrapper.to_graph = to_graph
+    wrapper.to_graph = to_graph  # type: ignore[attr-defined]
 
-    return wrapper
+    return cast(Graphable, wrapper)
 
 
 def delayed(function: Callable) -> Graphable:
     """
     Delayed decorator
 
-    Assumptions:
+    .. note::
 
-    - The function must have a return annotation
-    - Variadic positional arguments are supported, but must not contain other named arguments
-    - Function must not have any side effects
+        There are a few assumptions when decorating a function with the delayed decorator:
+
+        - The function must have a return annotation
+        - Variadic positional arguments are supported, but must not contain other named arguments
+        - Function must not have any side effects
 
     :param function: function to decorate
     :return: decorated function
@@ -216,6 +218,7 @@ def delayed(function: Callable) -> Graphable:
     @functools.wraps(function)
     def wrapper(*args, **kwargs) -> Union[Graph, GraphContext, Tuple[GraphContext, ...], Any]:
         # If all arguments are not GraphContext, compute function directly
+        # Note: cannot use bound_args because arg may be variadic
         if all(not isinstance(arg, GraphContext) for arg in itertools.chain(args, kwargs.values())):
             return function(*args, **kwargs)
 
@@ -278,11 +281,11 @@ def delayed(function: Callable) -> Graphable:
         )
 
     def to_graph(*args, **kwargs):
-        return generate_graph(wrapper, *args, **kwargs)
+        return _generate_graph(wrapper, *args, **kwargs)
 
-    wrapper.to_graph = to_graph
+    wrapper.to_graph = to_graph  # type: ignore[attr-defined]
 
-    return wrapper
+    return cast(Graphable, wrapper)
 
 
 def _merge_graphs(*graphs: Graph) -> Graph:
@@ -305,6 +308,38 @@ def _create_const(value: Any) -> GraphContext:
     )
 
 
+def _implicit_delayed(function: Callable) -> Graphable:
+    function.__implicit = True  # type: ignore[attr-defined]
+    return delayed(function)
+
+
+def _generate_graph(func: Callable, /, *args, **kwargs):
+    """
+    Generate a graph from a function and its materialized arguments.
+
+    :param func: function to generate a graph from
+    :param args: positional arguments to the function
+    :param kwargs: keyword arguments to the function
+    :return: generated graph
+    """
+    bound_args = inspect.signature(func).bind_partial(*args, **kwargs)
+
+    new_args = []
+    new_kwargs = {}
+    for name, param in bound_args.signature.parameters.items():
+        if param.default is not inspect.Parameter.empty:
+            continue
+
+        if param.kind == param.POSITIONAL_ONLY:
+            new_args.append(bound_args.arguments.get(name, external_input()))
+        elif param.kind in {param.POSITIONAL_OR_KEYWORD, param.KEYWORD_ONLY}:
+            new_kwargs[name] = bound_args.arguments.get(name, external_input())
+        else:
+            raise ValueError(f"unsupported parameter kind: {param.kind}")
+
+    return func(*new_args, **new_kwargs)
+
+
 # Register unary operators, may be missing some
 #
 # __hash__() is not included because since Python 3.3 hash randomization is enabled by default yielding impure hashes
@@ -324,6 +359,7 @@ for op in {
     operator.invert,
     operator.index,
 }:
+    op = cast(Callable, op)
 
     def wrapper(op: Callable):
         def meth(self) -> Any:
@@ -332,7 +368,7 @@ for op in {
         # Set the name of the method to the name of the operator
         meth.__name__ = op.__name__
 
-        return delayed(meth)
+        return _implicit_delayed(meth)
 
     setattr(GraphContext, f"__{op.__name__.strip('_')}__", wrapper(op))
 
@@ -346,7 +382,7 @@ for op in {round}:
         # Set the name of the method to the name of the operator
         meth.__name__ = op.__name__
 
-        return delayed(meth)
+        return _implicit_delayed(meth)
 
     setattr(GraphContext, f"__{op.__name__.strip('_')}__", wrapper(op))
 
@@ -375,6 +411,7 @@ for op in {
     operator.contains,
     format,
 }:
+    op = cast(Callable, op)
 
     def wrapper(op: Callable):
         def meth(self, other) -> Any:
@@ -383,12 +420,13 @@ for op in {
         # Set the name of the method to the name of the operator
         meth.__name__ = op.__name__
 
-        return delayed(meth)
+        return _implicit_delayed(meth)
 
     setattr(GraphContext, f"__{op.__name__.strip('_')}__", wrapper(op))
 
 # Register binary operators that allow an optional parameter
 for op in {pow}:
+    op = cast(Callable, op)
 
     def wrapper(op: Callable):
         def meth(self, other, param=None) -> Any:
@@ -397,10 +435,9 @@ for op in {pow}:
         # Set the name of the method to the name of the operator
         meth.__name__ = op.__name__
 
-        return delayed(meth)
+        return _implicit_delayed(meth)
 
     setattr(GraphContext, f"__{op.__name__.strip('_')}__", wrapper(op))
-
 
 # Register right-hand side binary operators, may be missing some
 for op in {
@@ -418,6 +455,7 @@ for op in {
     operator.xor,
     operator.or_,
 }:
+    op = cast(Callable, op)
 
     def wrapper(op: Callable):
         def meth(self, other) -> Any:
@@ -426,12 +464,13 @@ for op in {
         # Set the name of the method to the name of the operator
         meth.__name__ = op.__name__
 
-        return delayed(meth)
+        return _implicit_delayed(meth)
 
     setattr(GraphContext, f"__r{op.__name__.strip('_')}__", wrapper(op))
 
 # Register right-hand side binary operators that allow an optional parameter
 for op in {pow}:
+    op = cast(Callable, op)
 
     def wrapper(op: Callable):
         def meth(self, other, param=None) -> Any:
@@ -440,33 +479,6 @@ for op in {pow}:
         # Set the name of the method to the name of the operator
         meth.__name__ = op.__name__
 
-        return delayed(meth)
+        return _implicit_delayed(meth)
 
     setattr(GraphContext, f"__r{op.__name__.strip('_')}__", wrapper(op))
-
-
-def generate_graph(func: Callable, /, *args, **kwargs):
-    """
-    Generate a graph from a function and its materialized arguments.
-
-    :param func: function to generate a graph from
-    :param args: positional arguments to the function
-    :param kwargs: keyword arguments to the function
-    :return: generated graph
-    """
-    bound_args = inspect.signature(func).bind_partial(*args, **kwargs)
-
-    new_args = []
-    new_kwargs = {}
-    for name, param in bound_args.signature.parameters.items():
-        if param.default is not inspect.Parameter.empty:
-            continue
-
-        if param.kind == param.POSITIONAL_ONLY:
-            new_args.append(bound_args.arguments.get(name, external_input()))
-        elif param.kind in {param.POSITIONAL_OR_KEYWORD, param.KEYWORD_ONLY}:
-            new_kwargs[name] = bound_args.arguments.get(name, external_input())
-        else:
-            raise ValueError(f"unsupported parameter kind: {param.kind}")
-
-    return func(*new_args, **new_kwargs)

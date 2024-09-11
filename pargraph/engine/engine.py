@@ -3,20 +3,19 @@ import itertools
 import logging
 from collections import defaultdict, deque
 from concurrent.futures import FIRST_COMPLETED, Future, wait
-from typing import Any, Dict, Iterable, List, Optional, Set
+from typing import Any, DefaultDict, Dict, Hashable, Iterable, Optional, Set
 
 from loky import get_reusable_executor
 
 try:
     from pargraph.utility.graphlib_graphblas import TopologicalSorter
 except ImportError:
-    from graphlib import TopologicalSorter
+    from graphlib import TopologicalSorter  # type: ignore[assignment]
 
 
 class Backend(metaclass=abc.ABCMeta):
     @abc.abstractmethod
-    def submit(self, fn, /, *args, **kwargs) -> Future:
-        ...
+    def submit(self, fn, /, *args, **kwargs) -> Future: ...
 
 
 class GraphEngine:
@@ -58,8 +57,8 @@ class GraphEngine:
         graph = TopologicalSorter(graphlib_graph)
         graph.prepare()
 
-        results = {}
-        future_to_key = {}
+        results: Dict[Hashable, Any] = {}
+        future_to_key: Dict[Future[Any], Hashable] = {}
 
         # perform automatic reference counting to free results that are no longer needed
         def dereference_key(key):
@@ -139,7 +138,7 @@ class GraphEngine:
         return results[keys]
 
     @classmethod
-    def _flatten_iter(cls, seq: Iterable, container=list) -> List:
+    def _flatten_iter(cls, seq: Iterable, container=list) -> Iterable:
         for el in seq:
             # recursively flatten specific container types
             if isinstance(el, container):
@@ -149,7 +148,7 @@ class GraphEngine:
 
     @staticmethod
     def _is_submittable_function_computation(computation: Any) -> bool:
-        return isinstance(computation, tuple) and computation and callable(computation[0])
+        return isinstance(computation, tuple) and len(computation) > 0 and callable(computation[0])
 
     def _submit_function_computation(self, computation: Any, results: Dict, **kwargs) -> Optional[Future]:
         func, *args = computation
@@ -214,7 +213,7 @@ class GraphEngine:
 
     @staticmethod
     def _create_ref_count_graph(graph: Dict) -> Dict:
-        ref_count_graph = defaultdict(int)
+        ref_count_graph: DefaultDict[str, int] = defaultdict(int)
         for value in graph.values():
             for sub_value in value:
                 ref_count_graph[sub_value] += 1

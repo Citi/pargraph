@@ -21,6 +21,11 @@ class Result:
     """
 
     def __init__(self, name: str):
+        """
+        Initialize Result annotation
+
+        :param name: result name
+        """
         self.name = name
 
     def get_name(self) -> str:
@@ -32,7 +37,7 @@ class Result:
         return self.name
 
 
-def _get_output_names(function: Callable) -> Union[str, Tuple[str]]:
+def _get_output_names(function: Callable) -> Union[str, Tuple[str, ...]]:
     annotation = inspect.signature(function).return_annotation
     origin = get_origin(annotation)
 

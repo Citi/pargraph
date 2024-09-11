@@ -1,0 +1,17 @@
+__pychace__/
+*.py[cod]
+*$py.class
+
+build/
+dist/
+sdist/
+wheels/
+eggs/
+.eggs/
+.idea/
+.vscode/
+*.egg-info/
+*.egg
+.mypy_cache/
+
+venv*/

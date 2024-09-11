@@ -1,15 +1,19 @@
 import base64
 import copy
 import inspect
+import itertools
 import re
 import uuid
+import warnings
+from collections import defaultdict, deque
 from dataclasses import dataclass
-from typing import Any, Callable, Dict, List, Literal, Optional, Tuple, Union
+from typing import Any, Callable, DefaultDict, Dict, List, Literal, Optional, Tuple, TypedDict, Union, cast
 
 import cloudpickle
 import jsonschema
 import msgpack
 import pydot
+from bidict import bidict
 
 from pargraph.graph.annotation import _get_output_names
 
@@ -234,18 +238,22 @@ class FunctionCall:
         data = data.copy()
         function = data.pop("function")
         return FunctionCall(
-            function=cloudpickle.loads(base64.b64decode(function.encode("ascii")))
-            if data.pop("serialized", False)
-            else function,
+            function=(
+                cloudpickle.loads(base64.b64decode(function.encode("ascii")))
+                if data.pop("serialized", False)
+                else function
+            ),
             args={arg: _get_key_from_str(key_str) for arg, key_str in data.pop("args").items()},
             **data,
         )
 
     def to_dict(self) -> Dict[str, Any]:
         return {
-            "function": base64.b64encode(cloudpickle.dumps(self.function)).decode("ascii")
-            if callable(self.function)
-            else self.function,
+            "function": (
+                base64.b64encode(cloudpickle.dumps(self.function)).decode("ascii")
+                if callable(self.function)
+                else self.function
+            ),
             "serialized": callable(self.function),
             "args": {arg: key.to_str() for arg, key in self.args.items()},
         }
@@ -280,14 +288,26 @@ class GraphCall:
         )
 
     def to_dict(self) -> Dict[str, Any]:
-        dct = {"graph": self.graph.to_dict(), "args": {arg: key.to_str() for arg, key in self.args.items()}}
+        dct: dict = {"graph": self.graph.to_dict(), "args": {arg: key.to_str() for arg, key in self.args.items()}}
         if self.graph_name is not None:
             dct["graph_name"] = self.graph_name
         return dct
 
 
+class GraphDict(TypedDict):
+    consts: dict
+    inputs: dict
+    nodes: dict
+    edges: list
+    outputs: dict
+
+
 @dataclass(frozen=True)
 class Graph:
+    """
+    Graph representation
+    """
+
     consts: Dict[ConstKey, Const]
     inputs: Dict[InputKey, Optional[ConstKey]]
     nodes: Dict[NodeKey, Union[FunctionCall, GraphCall]]
@@ -299,24 +319,24 @@ class Graph:
         assert isinstance(self.nodes, dict), f"Nodes must be a dictionary; got type '{type(self.nodes)}'"
         assert isinstance(self.outputs, dict), f"Outputs must be a dictionary; got type '{type(self.outputs)}'"
 
-        for key, const in self.consts.items():
-            assert isinstance(key, ConstKey), f"Const key '{key}' must be type '{ConstKey}'"
+        for const_key, const in self.consts.items():
+            assert isinstance(const_key, ConstKey), f"Const key '{const_key}' must be type '{ConstKey}'"
             assert isinstance(const, Const), f"Const '{const}' must be type '{Const}'"
 
-        for key, input_node in self.inputs.items():
-            assert isinstance(key, InputKey), f"Input key '{key}' must be type '{InputKey}'"
+        for input_key, input_node in self.inputs.items():
+            assert isinstance(input_key, InputKey), f"Input key '{input_key}' must be type '{InputKey}'"
             assert input_node is None or isinstance(
                 input_node, ConstKey
             ), f"Input node '{input_node}' must be type '{ConstKey}' or None"
 
-        for key, node in self.nodes.items():
-            assert isinstance(key, NodeKey), f"Node key '{key}' must be type '{NodeKey}'"
+        for node_key, node in self.nodes.items():
+            assert isinstance(node_key, NodeKey), f"Node key '{node_key}' must be type '{NodeKey}'"
             assert isinstance(
                 node, (FunctionCall, GraphCall)
             ), f"Node '{node}' must be type '{FunctionCall}' or '{GraphCall}'"
 
-        for key, output in self.outputs.items():
-            assert isinstance(key, OutputKey), f"Output key '{key}' must be type '{OutputKey}'"
+        for output_key, output in self.outputs.items():
+            assert isinstance(output_key, OutputKey), f"Output key '{output_key}' must be type '{OutputKey}'"
             assert isinstance(
                 output, (ConstKey, InputKey, NodeOutputKey)
             ), f"Output '{output}' must be type '{ConstKey}', '{InputKey}', or '{NodeOutputKey}'"
@@ -340,53 +360,6 @@ class Graph:
         Create graph from graph dict with edge list
 
         :param data: graph dict with edge list
-
-            Example graph:
-
-            .. code-block:: json
-
-                {
-                    "consts": {
-                        "1": 1,
-                        "2": {
-                            "type": "int",
-                            "value": "2"
-                        }
-                    },
-                    "inputs: {
-                        "b": "consts:1"
-                    },
-                    "nodes": {
-                        "foo": {
-                            "function": "foo"
-                        },
-                        "bar": {
-                            "graph": "bar.json"
-                        }
-                    },
-                    "edges": [
-                        [
-                            "consts:1",
-                            "nodes:foo:inputs:a"
-                        ],
-                        [
-                            "consts:2",
-                            "nodes:foo:inputs:b"
-                        ],
-                        [
-                            "nodes:foo:outputs:output",
-                            "nodes:bar:inputs:a"
-                        ],
-                        [
-                            "inputs:b",
-                            "nodes:bar:inputs:b"
-                        ]
-                    ],
-                    "outputs": {
-                        "output": "nodes:bar:outputs:output"
-                    }
-                }
-
         :return: graph
         """
         # Use JSON Schema to produce better error messages
@@ -446,43 +419,6 @@ class Graph:
         Create graph from graph dict with node arguments
 
         :param data: graph dict with node arguments
-
-            Example graph:
-
-            .. code-block:: json
-
-                {
-                    "consts": {
-                        "1": 1,
-                        "2": {
-                            "type": "int",
-                            "value": "2"
-                        }
-                    },
-                    "inputs: {
-                        "b": "consts:1"
-                    },
-                    "nodes": {
-                        "foo": {
-                            "function": "foo",
-                            "args": {
-                                "a": "consts:1",
-                                "b": "consts:2"
-                            }
-                        },
-                        "bar": {
-                            "graph": "bar.json",
-                            "args": {
-                                "a": "nodes:foo:output",
-                                "b": "inputs:b"
-                            }
-                        }
-                    },
-                    "outputs": {
-                        "output": "nodes:bar:output"
-                    }
-                }
-
         :return: graph
         """
 
@@ -498,7 +434,7 @@ class Graph:
         return Graph(
             consts={ConstKey(key=key): Const.from_dict(value) for key, value in data.pop("consts").items()},
             inputs={
-                InputKey(key=key): _get_key_from_str(value) if value is not None else None
+                InputKey(key=key): cast(ConstKey, _get_key_from_str(value)) if value is not None else None
                 for key, value in data.pop("inputs").items()
             },
             nodes={NodeKey(key=key): _graph_node_from_dict(value) for key, value in data.pop("nodes").items()},
@@ -508,9 +444,11 @@ class Graph:
 
     def to_dict(self) -> Dict[str, Any]:
         """
-        Create graph representation to dictionary
+        Convert graph representation to serializable dictionary
+
+        :return: graph dictionary
         """
-        graph_dict = {"consts": {}, "inputs": {}, "nodes": {}, "edges": [], "outputs": {}}
+        graph_dict: GraphDict = {"consts": {}, "inputs": {}, "nodes": {}, "edges": [], "outputs": {}}
 
         for const_node_key, const_node in self.consts.items():
             graph_dict["consts"][const_node_key.key] = const_node.to_dict()
@@ -543,10 +481,17 @@ class Graph:
         # Sanity check the final graph dictionary
         jsonschema.validate(graph_dict, _graph_json_schema)
 
-        return graph_dict
+        return cast(dict, graph_dict)
 
     def to_dask(self, *args, **kwargs) -> Tuple[Dict[str, Any], List[str]]:
-        inputs = {**dict(zip(self.inputs.keys(), args)), **kwargs}
+        """
+        Convert graph to dask graph
+
+        :param args: positional arguments
+        :param kwargs: keyword arguments
+        :return: dask graph and output keys
+        """
+        inputs: dict = {**dict(zip(self.inputs.keys(), args)), **kwargs}
         return self._convert_graph_to_dask_graph(inputs=inputs)
 
     def to_dot(
@@ -557,7 +502,7 @@ class Graph:
         no_output: bool = False,
     ) -> pydot.Dot:
         """
-        Generate a dot graph from a graph
+        Generate dot graph from graph
 
         :param rankdir: rank direction ("LR", "RL", "TB", "BT")
         :param no_input: do not include input nodes
@@ -569,6 +514,7 @@ class Graph:
 
         for node_key, node in self.nodes.items():
             if isinstance(node, FunctionCall):
+                assert callable(node.function)
                 input_names = tuple(inspect.signature(node.function).parameters.keys())
                 output_names = _get_output_names(node.function)
                 output_names = output_names if isinstance(output_names, tuple) else (output_names,)
@@ -617,11 +563,7 @@ class Graph:
 
                     const = self.consts[arg]
                     value = const.to_value()
-
-                    if isinstance(value, (int, float, bool, str)) or value is None:
-                        label = str(value)
-                    else:
-                        label = type(value).__name__
+                    label = self._get_const_label(value)
 
                     dot.add_node(pydot.Node(f"const_{arg.key}", shape="box", label=label))
                     dot.add_edge(self._create_dot_edge(f"const_{arg.key}", f"{node_key.key}:inputs_{param}"))
@@ -642,9 +584,179 @@ class Graph:
 
             output_uuid = f"_{uuid.uuid4().hex}"
             dot.add_node(pydot.Node(output_uuid, shape="ellipse", label=output_key.key))
-            dot.add_edge(self._create_dot_edge(f"{output.key}:outputs_{output.output}", output_uuid))
+
+            if isinstance(output, ConstKey):
+                if no_const:
+                    continue
+
+                dot.add_edge(self._create_dot_edge(f"const_{output.key}", output_uuid))
+
+            elif isinstance(output, InputKey):
+                if no_input:
+                    continue
+
+                dot.add_edge(self._create_dot_edge(f"input_{output.key}", output_uuid))
+
+            elif isinstance(output, NodeOutputKey):
+                dot.add_edge(self._create_dot_edge(f"{output.key}:outputs_{output.output}", output_uuid))
 
         return dot
+
+    def stabilize(self, depth: int = -1) -> "Graph":
+        """
+        Stabilize the graph's node names to ensure the resulting graph is deterministic
+
+        .. note::
+
+            This method mutates the graph
+
+        :param depth: depth to stabilize subgraphs, default is -1 (stabilize all subgraphs)
+        :return: stabilized graph
+        """
+        if depth == 0:
+            return self
+
+        old_to_new: bidict[Union[ConstKey, NodeKey], Union[ConstKey, NodeKey]] = bidict(
+            cast(
+                Dict[Union[ConstKey, NodeKey], Union[ConstKey, NodeKey]],
+                {const_key: ConstKey(key=f"const_{i}") for i, const_key in enumerate(self.consts.keys())},
+            )
+        )
+
+        node_name_counter: DefaultDict[str, int] = defaultdict(int)
+        for node_key, node in self.nodes.items():
+            if isinstance(node, FunctionCall):
+                node_name = self._get_function_name(node.function)
+                node_name_with_index = f"{node_name}_{node_name_counter[node_name]}"
+
+            elif isinstance(node, GraphCall):
+                if depth > 1 or depth == -1:
+                    node.graph.stabilize(depth=depth - 1 if depth > 0 else -1)
+
+                node_name = node.graph_name
+
+                if node_name is None:
+                    random_node_name = f"_{uuid.uuid4().hex}"
+                    warnings.warn(f"Subgraph has no node name; generating random node name '{random_node_name}'")
+                    old_to_new[node_key] = NodeKey(key=random_node_name)
+                    continue
+
+                node_name_with_index = f"{node_name}_{node_name_counter[node_name]}"
+
+            else:
+                assert False, f"invalid node type '{type(node)}'"
+
+            if NodeKey(key=node_name_with_index) in old_to_new.inverse:
+                random_node_name = f"_{uuid.uuid4().hex}"
+                warnings.warn(
+                    f"Node name collision '{node_name_with_index}'; generating random node name '{random_node_name}'"
+                )
+                old_to_new[node_key] = NodeKey(key=random_node_name)
+                continue
+
+            old_to_new[node_key] = NodeKey(key=node_name_with_index)
+            node_name_counter[node_name] += 1
+
+        return self._scramble_keys(old_to_new)
+
+    def explode_subgraphs(self, depth: int = -1) -> "Graph":
+        """
+        Explode subgraphs in the graph
+
+        .. note::
+
+            This method mutates the graph
+
+        :param depth: depth to explode subgraphs, default is -1 (explode all subgraphs)
+        :return: exploded graph
+        """
+
+        def _peel_subgraphs(graph: Graph) -> Graph:
+            for node_key, node in list(graph.nodes.items()):
+                if not isinstance(node, GraphCall):
+                    continue
+
+                graph.nodes.pop(node_key)
+
+                node.graph._scramble_keys()
+                node.graph._replace_nodes(
+                    {
+                        **{
+                            input_key: input_node
+                            for input_key, input_node in node.graph.inputs.items()
+                            if input_node is not None
+                        },
+                        **{InputKey(key=arg_name): arg for arg_name, arg in node.args.items()},
+                    }
+                )
+
+                graph.consts.update(node.graph.consts)
+                graph.nodes.update(node.graph.nodes)
+
+                graph._replace_nodes(
+                    {
+                        NodeOutputKey(key=node_key.key, output=output_key.key): output
+                        for output_key, output in node.graph.outputs.items()
+                    }
+                )
+
+            return graph
+
+        graph = self
+        for _ in range(depth) if depth >= 0 else itertools.count():
+            graph = _peel_subgraphs(graph)
+
+            # break if there are no more subgraphs
+            if not any(isinstance(node, GraphCall) for node in graph.nodes.values()):
+                break
+
+        return graph
+
+    def cull(self, depth: int = -1) -> "Graph":
+        """
+        Remove nodes that are not connected to the output
+
+        .. note::
+
+            This method mutates the graph
+
+        :param depth: depth to cull subgraphs, default is -1 (cull all subgraphs)
+        :return: culled graph
+        """
+        if depth == 0:
+            return self
+
+        visited = set(NodeKey(key=output.key) for output in self.outputs.values() if isinstance(output, NodeOutputKey))
+        queue = deque(visited)
+
+        while queue:
+            key = queue.popleft()
+
+            for predecessor_key in self.nodes[key].args.values():
+                if not isinstance(predecessor_key, NodeOutputKey):
+                    continue
+
+                visiting_node_key = NodeKey(key=predecessor_key.key)
+                if visiting_node_key in visited:
+                    continue
+
+                visited.add(visiting_node_key)
+                queue.append(visiting_node_key)
+
+        for const_key in list(self.consts.keys()):
+            if const_key not in visited:
+                self.consts.pop(const_key)
+
+        for node_key in list(self.nodes.keys()):
+            if node_key not in visited:
+                self.nodes.pop(node_key)
+                continue
+
+            node = self.nodes[node_key]
+            if isinstance(node, GraphCall) and (depth > 1 or depth == -1):
+                node.graph.cull(depth=depth - 1 if depth > 0 else -1)
+
+        return self
 
     @staticmethod
     def _create_dot_edge(src: str, dst: str) -> pydot.Edge:
@@ -676,7 +788,6 @@ class Graph:
         """
         Convert our own graph format to a dask graph.
 
-        :param graph: graph to convert to dask graph
         :param inputs: inputs dictionary
         :param input_mapping: input mapping for subgraphs
         :param output_mapping: output mapping for subgraphs
@@ -689,33 +800,39 @@ class Graph:
 
         # create constants
         for const_key, const in self.consts.items():
-            graph_key = uuid.uuid4().hex
+            graph_key = f"const_{self._get_const_label(const)}_{uuid.uuid4().hex}"
             dask_graph[graph_key] = const.to_value()
             key_to_uuid[const_key] = graph_key
 
         # create inputs
         if inputs is not None:
             for input_key in self.inputs.keys():
-                graph_key = uuid.uuid4().hex
+                graph_key = f"input_{input_key.key}_{uuid.uuid4().hex}"
                 dask_graph[graph_key] = inputs[input_key.key]
                 key_to_uuid[input_key] = graph_key
 
         # assign random keys to all node paths and node output paths beforehand
-        for node_uuid, node in self.nodes.items():
+        for node_key, node in self.nodes.items():
             if isinstance(node, FunctionCall):
+                assert callable(node.function)
                 output_names = _get_output_names(node.function)
                 output_names = output_names if isinstance(output_names, tuple) else (output_names,)
                 for output_name in output_names:
-                    key_to_uuid[NodeOutputKey(key=node_uuid.key, output=output_name)] = uuid.uuid4().hex
+                    key_to_uuid[NodeOutputKey(key=node_key.key, output=output_name)] = (
+                        f"node_output_{self._get_function_name(node.function)}_{uuid.uuid4().hex}"
+                    )
 
             elif isinstance(node, GraphCall):
                 for output_key in node.graph.outputs.keys():
-                    key_to_uuid[NodeOutputKey(key=node_uuid.key, output=output_key.key)] = uuid.uuid4().hex
+                    graph_name = node.graph_name if node.graph_name is not None else node_key.key
+                    key_to_uuid[NodeOutputKey(key=node_key.key, output=output_key.key)] = (
+                        f"node_output_{graph_name}_{output_key.key}_{uuid.uuid4().hex}"
+                    )
 
         # overwrite keys of exported node output paths
         if output_mapping is not None:
-            for output_name, graph_key in output_mapping.items():
-                key_to_uuid[self.outputs[output_name]] = graph_key
+            for output_key, graph_key in output_mapping.items():
+                key_to_uuid[self.outputs[output_key]] = graph_key
 
         # import input mappings into current input mapping
         if input_mapping is not None:
@@ -728,6 +845,7 @@ class Graph:
         # build dask graph
         for node_key, node in self.nodes.items():
             if isinstance(node, FunctionCall):
+                assert callable(node.function)
                 function_annotation = inspect.signature(node.function)
 
                 # convert variadic positional arguments to positional arguments
@@ -740,17 +858,18 @@ class Graph:
                     for param_name, input_annotation in function_annotation.parameters.items():
                         # handle default arguments
                         if param_name not in node.args:
-                            key = uuid.uuid4().hex
-                            dask_graph[key] = input_annotation.default
-                            args.append(key)
+                            graph_key = f"const_{self._get_const_label(input_annotation.default)}_{uuid.uuid4().hex}"
+                            dask_graph[graph_key] = input_annotation.default
+                            args.append(graph_key)
                             continue
 
                         path = node.args[param_name]
                         args.append(key_to_uuid[path])
 
                 # unpack tuple output
+                assert callable(node.function)
                 output_names = _get_output_names(node.function)
-                node_uuid = uuid.uuid4().hex
+                node_uuid = f"node_{self._get_function_name(node.function)}_{uuid.uuid4().hex}"
                 for output_position, output_name in (
                     enumerate(output_names) if isinstance(output_names, tuple) else ((None, output_names),)
                 ):
@@ -760,7 +879,7 @@ class Graph:
                         node_uuid = graph_key
                         break
 
-                    constant_key = uuid.uuid4().hex
+                    constant_key = f"const_{self._get_const_label(output_position)}_{uuid.uuid4().hex}"
                     dask_graph[constant_key] = output_position
                     dask_graph[graph_key] = (_unpack_tuple, node_uuid, constant_key)
 
@@ -781,6 +900,117 @@ class Graph:
 
         return dask_graph, [key_to_uuid[output_path] for output_path in self.outputs.values()]
 
+    def _scramble_keys(
+        self, old_to_new: Optional[bidict[Union[ConstKey, NodeKey], Union[ConstKey, NodeKey]]] = None
+    ) -> "Graph":
+        """
+        Scramble keys of the graph
+
+        .. note::
+
+            This method mutates the graph
+
+        :param old_to_new: old to new key mapping
+        :return: scrambled graph
+        """
+        if old_to_new is None:
+            old_to_new = bidict(
+                cast(
+                    Dict[Union[ConstKey, NodeKey], Union[ConstKey, NodeKey]],
+                    {
+                        **{const_key: ConstKey(key=f"_{uuid.uuid4().hex}") for const_key in self.consts.keys()},
+                        **{node_key: NodeKey(key=f"_{uuid.uuid4().hex}") for node_key in self.nodes.keys()},
+                    },
+                )
+            )
+
+        # remap inputs
+        for input_key, input_node in self.inputs.items():
+            if input_node is None:
+                continue
+
+            new_const_key = old_to_new[input_node]
+            assert isinstance(new_const_key, ConstKey)
+            self.inputs[input_key] = new_const_key
+
+        # remap outputs
+        for output_key, output in self.outputs.items():
+            if isinstance(output, ConstKey):
+                new_const_key = old_to_new[output]
+                assert isinstance(new_const_key, ConstKey)
+                self.outputs[output_key] = new_const_key
+            elif isinstance(output, NodeOutputKey):
+                self.outputs[output_key] = NodeOutputKey(
+                    key=old_to_new[NodeKey(key=output.key)].key, output=output.output
+                )
+
+        # replace consts
+        for const_key in list(self.consts.keys()):
+            new_const_key = old_to_new[const_key]
+            assert isinstance(new_const_key, ConstKey)
+            self.consts[new_const_key] = self.consts.pop(const_key)
+
+        # remap node args and replace nodes
+        for node_key, node in list(self.nodes.items()):
+            for arg_name, arg in node.args.items():
+                if isinstance(arg, ConstKey):
+                    new_const_key = old_to_new[arg]
+                    assert isinstance(new_const_key, ConstKey)
+                    node.args[arg_name] = new_const_key
+                elif isinstance(arg, NodeOutputKey):
+                    node.args[arg_name] = NodeOutputKey(key=old_to_new[NodeKey(key=arg.key)].key, output=arg.output)
+
+            if isinstance(node, GraphCall):
+                node.graph.stabilize()
+
+            new_node_key = old_to_new[node_key]
+            assert isinstance(new_node_key, NodeKey)
+            self.nodes[new_node_key] = self.nodes.pop(node_key)
+
+        return self
+
+    def _replace_nodes(
+        self, mapping: Dict[Union[ConstKey, InputKey, NodeOutputKey], Union[ConstKey, InputKey, NodeOutputKey]]
+    ) -> "Graph":
+        """
+        Replace nodes in the graph
+
+        .. note::
+
+            This method mutates the graph
+
+        :param mapping: mapping of old nodes to new nodes
+        :return: graph
+        """
+        for node_key, node in self.nodes.items():
+            for arg_name, arg in node.args.items():
+                if arg in mapping:
+                    node.args[arg_name] = mapping[arg]
+
+        for output_key, output in self.outputs.items():
+            if output in mapping:
+                self.outputs[output_key] = mapping[output]
+
+        return self
+
+    @staticmethod
+    def _get_const_label(value: Any) -> str:
+        if isinstance(value, (int, float, bool, str)) or value is None:
+            return str(value)
+
+        return type(value).__name__
+
+    @staticmethod
+    def _get_function_name(function: Union[str, Callable]) -> str:
+        return function.__name__ if callable(function) else function
+
 
 def _unpack_tuple(graph_key: tuple, index: int) -> Any:
+    """
+    Unpack tuple at index
+
+    :param graph_key: tuple
+    :param index: index
+    :return: value at index
+    """
     return graph_key[index]
