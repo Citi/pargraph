@@ -10,7 +10,7 @@ from loky import get_reusable_executor
 try:
     from pargraph.utility.graphlib_graphblas import TopologicalSorter
 except ImportError:
-    from graphlib import TopologicalSorter  # type: ignore[assignment]
+    from graphlib import TopologicalSorter  # type: ignore[assignment,no-redef]
 
 
 class Backend(metaclass=abc.ABCMeta):
