@@ -1,0 +1,57 @@
+[build-system]
+requires = ["setuptools", "setuptools-scm", "mypy", "black", "flake8", "pyproject-flake8"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "pargraph"
+description = "Distributed graph computation library"
+requires-python = ">=3.8"
+readme = { file = "README.md", content-type = "text/markdown" }
+license = { text = "Apache 2.0" }
+authors = [{ name = "Citi", email = "opensource@citi.com" }]
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: Apache Software License",
+    "Intended Audience :: Developers",
+    "Operating System :: OS Independent",
+    "Topic :: System :: Distributed Computing",
+]
+dynamic = ["dependencies", "version"]
+
+[project.urls]
+Home = "https://github.com/Citi/pargraph"
+
+[project.optional-dependencies]
+graphblas = ["python-graphblas", "numpy"]
+
+[tool.setuptools]
+packages = ["pargraph"]
+include-package-data = true
+
+[tool.setuptools.dynamic]
+dependencies = { file = "requirements.txt" }
+version = { attr = "pargraph.about.__version__" }
+
+[tool.mypy]
+no_strict_optional = true
+check_untyped_defs = true
+ignore_missing_imports = true
+exclude = [
+    "^docs.*$",
+    "^venv.*$"
+]
+
+[tool.flake8]
+count = true
+statistics = true
+max-line-length = 120
+extend-ignore = ["E203"]
+exclude = "venv"
+
+[tool.black]
+line-length = 120
+skip-magic-trailing-comma = true
+
+[metadata]
+long_description = { file = "README.md" }
+long_description_content_type = "text/markdown"

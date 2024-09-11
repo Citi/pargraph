@@ -2,11 +2,12 @@ import unittest
 import uuid
 from concurrent.futures import Future
 from operator import add
-from typing import Any, Callable, Dict, Tuple
+from typing import Any, Callable, Dict, Optional, Tuple, cast
 
 from loky import get_reusable_executor
 
 from pargraph import GraphEngine
+from pargraph.engine.engine import Backend
 
 
 def generate_binary_tree_graph(binary_op: Callable = add, leaf_value: Any = 1, max_height: int = 3) -> Tuple[Dict, str]:
@@ -23,7 +24,7 @@ def generate_binary_tree_graph(binary_op: Callable = add, leaf_value: Any = 1, m
         create_binary_tree_node(left, height - 1)
         create_binary_tree_node(right, height - 1)
 
-    graph = {}
+    graph: dict = {}
     root = str(uuid.uuid4())
     create_binary_tree_node(root, max_height)
     return graph, root
@@ -34,7 +35,7 @@ def add_one(func: Callable, *args) -> int:
 
 
 class TestEngineBase(unittest.TestCase):
-    engine = None
+    engine: Optional[GraphEngine] = None
 
     @classmethod
     def setUpClass(cls):
@@ -82,11 +83,11 @@ class TestEngineCustomBackend(TestEngineBase):
                 pass
 
             def submit(self, fn, /, *args, **kwargs) -> Future:
-                future = Future()
+                future: Future[Any] = Future()
                 future.set_result(fn(*args, **kwargs))
                 return future
 
-        cls.engine = GraphEngine(CustomBackend())
+        cls.engine = GraphEngine(cast(Backend, CustomBackend()))
 
 
 if __name__ == "__main__":

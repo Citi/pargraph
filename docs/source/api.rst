@@ -11,17 +11,15 @@ Graph Generation
 .. autoclass:: pargraph.Result
    :members:
 
-   .. automethod:: __init__
-
-.. autoclass:: pargraph.graph.decorators.Graphable
+.. autoclass:: pargraph.graph.decorators.Graphable()
    :members:
+   :special-members: __call__
 
-    .. automethod:: __call__
+.. autoclass:: pargraph.graph.objects.Graph()
+   :members:
 
 Graph Engine
 ------------
 
 .. autoclass:: pargraph.GraphEngine
    :members:
-
-   .. automethod:: __init__

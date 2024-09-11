@@ -20,11 +20,11 @@ class TopologicalSorter:
     def __init__(self, graph: Optional[Dict[Hashable, Iterable[Hashable]]] = None):
         # the layout of the matrix is (in-vertex, out-vertex)
         self._matrix = gb.Matrix(gb.dtypes.BOOL)
-        self._key_to_id = bidict()
+        self._key_to_id: bidict[Hashable, int] = bidict()
 
-        self._graph_matrix_mask = None
-        self._visited_vertices_mask = None
-        self._ready_nodes = None
+        self._graph_matrix_mask: Optional[np.ndarray] = None
+        self._visited_vertices_mask: Optional[np.ndarray] = None
+        self._ready_nodes: Optional[List[Hashable]] = None
 
         self._n_done = 0
         self._n_visited = 0
@@ -85,7 +85,7 @@ class TopologicalSorter:
         if self._has_cycle():
             raise CycleError("cycle detected")
 
-    def get_ready(self) -> Tuple[Hashable]:
+    def get_ready(self) -> Tuple[Hashable, ...]:
         if self._ready_nodes is None:
             raise ValueError("prepare() must be called first")
 

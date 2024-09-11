@@ -1,5 +1,6 @@
 import importlib.util
 import unittest
+from typing import Optional
 
 
 @unittest.skipIf(importlib.util.find_spec("graphblas") is None, "GraphBLAS is not installed")
@@ -9,8 +10,11 @@ class TestTopologicalSortGraphBLAS(unittest.TestCase):
     https://github.com/python/cpython/blob/4a3ea1fdd890e5e2ec26540dc3c958a52fba6556/Lib/test/test_graphlib.py
     """
 
-    from pargraph.utility.graphlib_graphblas import CycleError
-    from pargraph.utility.graphlib_graphblas import TopologicalSorter as TopologicalSorterGraphBLAS
+    @staticmethod
+    def _create_topological_sorter(graph: Optional[dict] = None):
+        from pargraph.utility.graphlib_graphblas import TopologicalSorter
+
+        return TopologicalSorter(graph)
 
     def _test_graph(self, graph, expected):
         def static_order_multiple_done(ts):
@@ -34,17 +38,19 @@ class TestTopologicalSortGraphBLAS(unittest.TestCase):
                 self.assertEqual(set(group), set(ordering[ptr:end]))
                 ptr = end
 
-        ts = self.TopologicalSorterGraphBLAS(graph)
+        ts = self._create_topological_sorter(graph)
         check_ordering_with_expected(static_order_multiple_done(ts))
 
-        ts = self.TopologicalSorterGraphBLAS(graph)
+        ts = self._create_topological_sorter(graph)
         check_ordering_with_expected(ts.static_order())
 
     def _assert_cycle(self, graph):
-        ts = self.TopologicalSorterGraphBLAS()
+        from pargraph.utility.graphlib_graphblas import CycleError
+
+        ts = self._create_topological_sorter()
         for node, dependson in graph.items():
             ts.add(node, *dependson)
-        with self.assertRaises(self.CycleError):
+        with self.assertRaises(CycleError):
             ts.prepare()
 
     def test_simple_cases(self):
@@ -78,7 +84,7 @@ class TestTopologicalSortGraphBLAS(unittest.TestCase):
         self._test_graph({1: {2}, 3: {4}, 0: [2, 4, 4, 4, 4, 4]}, [(2, 4), (1, 3, 0)])
 
         # Test adding the same dependency multiple times
-        ts = self.TopologicalSorterGraphBLAS()
+        ts = self._create_topological_sorter()
         ts.add(1, 2)
         ts.add(1, 2)
         ts.add(1, 2)
@@ -86,18 +92,18 @@ class TestTopologicalSortGraphBLAS(unittest.TestCase):
 
     def test_graph_with_iterables(self):
         dependson = (2 * x + 1 for x in range(5))
-        ts = self.TopologicalSorterGraphBLAS({0: dependson})
+        ts = self._create_topological_sorter({0: dependson})
         self.assertEqual(list(ts.static_order()), [1, 3, 5, 7, 9, 0])
 
     def test_add_dependencies_for_same_node_incrementally(self):
         # Test same node multiple times
-        ts = self.TopologicalSorterGraphBLAS()
+        ts = self._create_topological_sorter()
         ts.add(1, 2)
         ts.add(1, 3)
         ts.add(1, 4)
         ts.add(1, 5)
 
-        ts2 = self.TopologicalSorterGraphBLAS({1: {2, 3, 4, 5}})
+        ts2 = self._create_topological_sorter({1: {2, 3, 4, 5}})
         self.assertEqual([*ts.static_order()], [*ts2.static_order()])
 
     def test_empty(self):
@@ -118,7 +124,7 @@ class TestTopologicalSortGraphBLAS(unittest.TestCase):
         self._assert_cycle({1: {2}, 2: {3}, 3: {2, 4}, 4: {5}})
 
     def test_calls_before_prepare(self):
-        ts = self.TopologicalSorterGraphBLAS()
+        ts = self._create_topological_sorter()
 
         with self.assertRaises(ValueError):
             ts.get_ready()
@@ -128,13 +134,13 @@ class TestTopologicalSortGraphBLAS(unittest.TestCase):
             ts.is_active()
 
     def test_prepare_multiple_times(self):
-        ts = self.TopologicalSorterGraphBLAS()
+        ts = self._create_topological_sorter()
         ts.prepare()
         with self.assertRaises(ValueError):
             ts.prepare()
 
     def test_invalid_nodes_in_done(self):
-        ts = self.TopologicalSorterGraphBLAS()
+        ts = self._create_topological_sorter()
         ts.add(1, 2, 3, 4)
         ts.add(2, 3, 4)
         ts.prepare()
@@ -146,7 +152,7 @@ class TestTopologicalSortGraphBLAS(unittest.TestCase):
             ts.done(24)
 
     def test_done(self):
-        ts = self.TopologicalSorterGraphBLAS()
+        ts = self._create_topological_sorter()
         ts.add(1, 2, 3, 4)
         ts.add(2, 3)
         ts.prepare()
@@ -168,7 +174,7 @@ class TestTopologicalSortGraphBLAS(unittest.TestCase):
         self.assertFalse(ts.is_active())
 
     def test_is_active(self):
-        ts = self.TopologicalSorterGraphBLAS()
+        ts = self._create_topological_sorter()
         ts.add(1, 2)
         ts.prepare()
 
@@ -183,7 +189,7 @@ class TestTopologicalSortGraphBLAS(unittest.TestCase):
         self.assertFalse(ts.is_active())
 
     def test_not_hashable_nodes(self):
-        ts = self.TopologicalSorterGraphBLAS()
+        ts = self._create_topological_sorter()
         self.assertRaises(TypeError, ts.add, dict(), 1)
         self.assertRaises(TypeError, ts.add, 1, dict())
         self.assertRaises(TypeError, ts.add, dict(), dict())
@@ -196,14 +202,14 @@ class TestTopologicalSortGraphBLAS(unittest.TestCase):
                 ts.done(*nodes)
                 yield set(nodes)
 
-        ts = self.TopologicalSorterGraphBLAS()
+        ts = self._create_topological_sorter()
         ts.add(3, 2, 1)
         ts.add(1, 0)
         ts.add(4, 5)
         ts.add(6, 7)
         ts.add(4, 7)
 
-        ts2 = self.TopologicalSorterGraphBLAS()
+        ts2 = self._create_topological_sorter()
         ts2.add(1, 0)
         ts2.add(3, 2, 1)
         ts2.add(4, 7)

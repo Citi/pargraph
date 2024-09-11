@@ -9,7 +9,7 @@ Welcome to Pargraph's documentation!
 .. toctree::
    :maxdepth: 2
 
-   api/index
+   api
 
 Indices and tables
 ==================
