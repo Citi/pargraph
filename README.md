@@ -13,6 +13,9 @@
     <a href="./LICENSE">
         <img src="https://img.shields.io/github/license/citi/pargraph?label=license&colorA=0f1632&colorB=255be3">
     </a>
+    <a href="https://pypi.org/project/pargraph/">
+      <img alt="PyPI - Version" src="https://img.shields.io/pypi/v/pargraph?colorA=0f1632&colorB=255be3">
+    </a>
   </p>
 </div>
 
