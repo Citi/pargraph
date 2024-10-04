@@ -270,7 +270,7 @@ class TestGraphGeneration(unittest.TestCase):
         @graph
         def sample_graph(x: int, y: int = 1) -> int:
             return x + y
-        
+
         self.assertEqual(self.engine.get(*sample_graph.to_graph().to_dask(x=2, y=3))[0], sample_graph(x=2, y=3))
 
     def test_graph_default_argument_missing(self):
