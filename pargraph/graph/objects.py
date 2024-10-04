@@ -809,6 +809,10 @@ class Graph:
             for input_key in self.inputs.keys():
                 graph_key = f"input_{input_key.key}_{uuid.uuid4().hex}"
                 dask_graph[graph_key] = inputs[input_key.key]
+                # if input key is not in inputs, use the default value
+                dask_graph[graph_key] = (
+                    inputs[input_key.key] if input_key.key in inputs else self.consts[self.inputs[input_key]].to_value()
+                )
                 key_to_uuid[input_key] = graph_key
 
         # assign random keys to all node paths and node output paths beforehand

@@ -162,6 +162,16 @@ def graph(function: Callable) -> Graphable:
 
         # Short circuit if external input is passed in (for top-level graph calls)
         if any(arg._target is None for arg in bound_args.arguments.values() if isinstance(arg, GraphContext)):
+            # Inject default values for external inputs
+            for name, arg in bound_args.arguments.items():
+                default_value = bound_args.signature.parameters[name].default
+                if default_value is inspect.Parameter.empty:
+                    continue
+                
+                const_id = f"_{uuid.uuid4().hex}"
+                sub_graph.consts[ConstKey(key=const_id)] = Const.from_value(default_value)
+                sub_graph.inputs[InputKey(key=name)] = ConstKey(key=const_id)
+
             return sub_graph
 
         # Inject sub graph into parent graph
@@ -242,7 +252,7 @@ def delayed(function: Callable) -> Graphable:
 
         # Short circuit if external input is passed in (for top-level delayed calls)
         if any(graph_context._target is None for graph_context in arg_dict.values()):
-            return Graph(
+            graph_result = Graph(
                 consts={
                     ConstKey(key=name): arg._graph.consts[arg._target]
                     for name, arg in arg_dict.items()
@@ -263,6 +273,18 @@ def delayed(function: Callable) -> Graphable:
                     for output_name in (output_names if isinstance(output_names, tuple) else (output_names,))
                 },
             )
+
+            # Inject default values for external inputs
+            for name, arg in bound_args.arguments.items():
+                default_value = bound_args.signature.parameters[name].default
+                if default_value is inspect.Parameter.empty:
+                    continue
+
+                const_id = f"_{uuid.uuid4().hex}"
+                graph_result.consts[ConstKey(key=const_id)] = Const.from_value(default_value)
+                graph_result.inputs[InputKey(key=name)] = ConstKey(key=const_id)
+            
+            return graph_result
 
         # Inject function call node into graph
         node_id = f"{function.__name__}_{uuid.uuid4().hex}"
@@ -327,9 +349,6 @@ def _generate_graph(func: Callable, /, *args, **kwargs):
     new_args = []
     new_kwargs = {}
     for name, param in bound_args.signature.parameters.items():
-        if param.default is not inspect.Parameter.empty:
-            continue
-
         if param.kind == param.POSITIONAL_ONLY:
             new_args.append(bound_args.arguments.get(name, external_input()))
         elif param.kind in {param.POSITIONAL_OR_KEYWORD, param.KEYWORD_ONLY}:
