@@ -167,7 +167,7 @@ def graph(function: Callable) -> Graphable:
                 default_value = bound_args.signature.parameters[name].default
                 if default_value is inspect.Parameter.empty:
                     continue
-                
+
                 const_id = f"_{uuid.uuid4().hex}"
                 sub_graph.consts[ConstKey(key=const_id)] = Const.from_value(default_value)
                 sub_graph.inputs[InputKey(key=name)] = ConstKey(key=const_id)
@@ -283,7 +283,7 @@ def delayed(function: Callable) -> Graphable:
                 const_id = f"_{uuid.uuid4().hex}"
                 graph_result.consts[ConstKey(key=const_id)] = Const.from_value(default_value)
                 graph_result.inputs[InputKey(key=name)] = ConstKey(key=const_id)
-            
+
             return graph_result
 
         # Inject function call node into graph
