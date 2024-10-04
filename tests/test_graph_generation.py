@@ -265,3 +265,31 @@ class TestGraphGeneration(unittest.TestCase):
 
         assert isinstance(function_call, FunctionCall)
         self.assertEqual(getattr(function_call.function, "__implicit", False), True)
+
+    def test_graph_default_argument(self):
+        @graph
+        def sample_graph(x: int, y: int = 1) -> int:
+            return x + y
+        
+        self.assertEqual(self.engine.get(*sample_graph.to_graph().to_dask(x=2, y=3))[0], sample_graph(x=2, y=3))
+
+    def test_graph_default_argument_missing(self):
+        @graph
+        def sample_graph(x: int, y: int = 1) -> int:
+            return x + y
+
+        self.assertEqual(self.engine.get(*sample_graph.to_graph().to_dask(x=2))[0], sample_graph(x=2))
+
+    def test_function_default_argument(self):
+        @graph
+        def add(x: int, y: int = 1) -> int:
+            return x + y
+
+        self.assertEqual(self.engine.get(*add.to_graph().to_dask(x=2, y=3))[0], add(x=2, y=3))
+
+    def test_function_default_argument_missing(self):
+        @graph
+        def add(x: int, y: int = 1) -> int:
+            return x + y
+
+        self.assertEqual(self.engine.get(*add.to_graph().to_dask(x=2))[0], add(x=2))
