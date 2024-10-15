@@ -6,7 +6,7 @@ import operator
 import uuid
 import warnings
 from dataclasses import dataclass
-from typing import Any, Callable, Optional, Protocol, Tuple, Union, cast
+from typing import Any, Callable, Optional, Protocol, Tuple, Union, cast, Iterator
 
 from pargraph.graph.annotation import _get_output_names
 from pargraph.graph.objects import (
@@ -151,10 +151,13 @@ def graph(function: Callable) -> Graphable:
                     nodes=graph_context._graph.nodes,
                     outputs={OutputKey(key=output_name): graph_context._target},
                 )
-                for output_name, graph_context in (
-                    zip(output_names, graph_result)
-                    if isinstance(output_names, tuple)
-                    else ((output_names, graph_result),)
+                for output_name, graph_context in cast(
+                    Iterator[Tuple[str, GraphContext]],
+                    (
+                        zip(output_names, graph_result)
+                        if isinstance(output_names, tuple)
+                        else ((output_names, graph_result),)
+                    ),
                 )
                 if isinstance(graph_context, GraphContext)
             )

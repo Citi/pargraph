@@ -7,7 +7,7 @@ import uuid
 import warnings
 from collections import defaultdict, deque
 from dataclasses import dataclass
-from typing import Any, Callable, DefaultDict, Dict, List, Literal, Optional, Tuple, TypedDict, Union, cast
+from typing import Any, Callable, DefaultDict, Dict, List, Literal, Optional, Tuple, TypedDict, Union, cast, Iterator
 
 import cloudpickle
 import jsonschema
@@ -703,7 +703,7 @@ class Graph:
             return graph
 
         graph = self
-        for _ in range(depth) if depth >= 0 else itertools.count():
+        for _ in cast(Iterator, range(depth) if depth >= 0 else itertools.count()):
             graph = _peel_subgraphs(graph)
 
             # break if there are no more subgraphs
@@ -873,8 +873,9 @@ class Graph:
                 assert callable(node.function)
                 output_names = _get_output_names(node.function)
                 node_uuid = f"node_{self._get_function_name(node.function)}_{uuid.uuid4().hex}"
-                for output_position, output_name in (
-                    enumerate(output_names) if isinstance(output_names, tuple) else ((None, output_names),)
+                for output_position, output_name in cast(
+                    Iterator[Tuple[Optional[int], str]],
+                    enumerate(output_names) if isinstance(output_names, tuple) else ((None, output_names),),
                 ):
                     graph_key = key_to_uuid[NodeOutputKey(key=node_key.key, output=output_name)]
 
