@@ -7,7 +7,7 @@ import uuid
 import warnings
 from collections import defaultdict, deque
 from dataclasses import dataclass
-from typing import Any, Callable, DefaultDict, Dict, List, Literal, Optional, Tuple, TypedDict, Union, cast
+from typing import Any, Callable, DefaultDict, Dict, List, Literal, Optional, Tuple, TypedDict, Union, cast, Iterator
 
 import cloudpickle
 import jsonschema
@@ -703,7 +703,7 @@ class Graph:
             return graph
 
         graph = self
-        for _ in range(depth) if depth >= 0 else itertools.count():
+        for _ in cast(Iterator, range(depth) if depth >= 0 else itertools.count()):
             graph = _peel_subgraphs(graph)
 
             # break if there are no more subgraphs
@@ -808,7 +808,10 @@ class Graph:
         if inputs is not None:
             for input_key in self.inputs.keys():
                 graph_key = f"input_{input_key.key}_{uuid.uuid4().hex}"
-                dask_graph[graph_key] = inputs[input_key.key]
+                # if input key is not in inputs, use the default value
+                dask_graph[graph_key] = (
+                    inputs[input_key.key] if input_key.key in inputs else self.consts[self.inputs[input_key]].to_value()
+                )
                 key_to_uuid[input_key] = graph_key
 
         # assign random keys to all node paths and node output paths beforehand
@@ -870,8 +873,9 @@ class Graph:
                 assert callable(node.function)
                 output_names = _get_output_names(node.function)
                 node_uuid = f"node_{self._get_function_name(node.function)}_{uuid.uuid4().hex}"
-                for output_position, output_name in (
-                    enumerate(output_names) if isinstance(output_names, tuple) else ((None, output_names),)
+                for output_position, output_name in cast(
+                    Iterator[Tuple[Optional[int], str]],
+                    enumerate(output_names) if isinstance(output_names, tuple) else ((None, output_names),),
                 ):
                     graph_key = key_to_uuid[NodeOutputKey(key=node_key.key, output=output_name)]
 
