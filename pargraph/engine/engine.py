@@ -41,9 +41,9 @@ class GraphEngine:
 
     def get(self, graph: Dict, keys: Any, **kwargs) -> Any:
         """
-        Compute task graph
+        Compute dict graph
 
-        :param graph: task graph
+        :param graph: dict graph
         :param keys: keys to compute (e.g. ``"x"``, ``["x", "y", "z"]``, etc)
         :param kwargs: keyword arguments to forward to the parallel backend
         :return: results in the same structure as keys

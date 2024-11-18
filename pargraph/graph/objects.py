@@ -97,10 +97,10 @@ class Const:
         assert isinstance(self.value, str), f"Value must be a string; got type '{type(self.value)}'"
 
     @staticmethod
-    def from_dict(data: Dict) -> "Const":
+    def from_json(data: Dict) -> "Const":
         return Const(**data)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_json(self) -> Dict[str, Any]:
         return {"type": self.type, "value": self.value}
 
     @staticmethod
@@ -234,7 +234,7 @@ class FunctionCall:
             ), f"Arg '{arg}' must ConstKey, InputKey, or NodeOutputKey; got type '{type(arg)}'"
 
     @staticmethod
-    def from_dict(data: Dict) -> "FunctionCall":
+    def from_json(data: Dict) -> "FunctionCall":
         data = data.copy()
         function = data.pop("function")
         return FunctionCall(
@@ -247,7 +247,7 @@ class FunctionCall:
             **data,
         )
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_json(self) -> Dict[str, Any]:
         return {
             "function": (
                 base64.b64encode(cloudpickle.dumps(self.function)).decode("ascii")
@@ -279,16 +279,16 @@ class GraphCall:
             ), f"Arg '{arg}' must ConstKey, InputKey, or NodeOutputKey; got type '{type(arg)}'"
 
     @staticmethod
-    def from_dict(data: Dict) -> "GraphCall":
+    def from_json(data: Dict) -> "GraphCall":
         data = data.copy()
         return GraphCall(
-            graph=Graph.from_dict(data.pop("graph")),
+            graph=Graph.from_json(data.pop("graph")),
             args={arg: _get_key_from_str(key_str) for arg, key_str in data.pop("args").items()},
             **data,
         )
 
-    def to_dict(self) -> Dict[str, Any]:
-        dct: dict = {"graph": self.graph.to_dict(), "args": {arg: key.to_str() for arg, key in self.args.items()}}
+    def to_json(self) -> Dict[str, Any]:
+        dct: dict = {"graph": self.graph.to_json(), "args": {arg: key.to_str() for arg, key in self.args.items()}}
         if self.graph_name is not None:
             dct["graph_name"] = self.graph_name
         return dct
@@ -342,22 +342,22 @@ class Graph:
             ), f"Output '{output}' must be type '{ConstKey}', '{InputKey}', or '{NodeOutputKey}'"
 
     @staticmethod
-    def from_dict(data: Dict) -> "Graph":
+    def from_json(data: Dict) -> "Graph":
         """
-        Create graph from graph dict by inferring the graph dict type
+        Create graph from json serializable dictionary by inferring the graph type
 
         :param data: graph dict
         :return: graph
         """
         if "edges" in data:
-            return Graph.from_dict_with_edge_list(data)
+            return Graph.from_json_with_edge_list(data)
 
-        return Graph.from_dict_with_node_arguments(data)
+        return Graph.from_json_with_node_arguments(data)
 
     @staticmethod
-    def from_dict_with_edge_list(data: Dict) -> "Graph":
+    def from_json_with_edge_list(data: Dict) -> "Graph":
         """
-        Create graph from graph dict with edge list
+        Create graph from json serializable dictionary with edge list
 
         :param data: graph dict with edge list
         :return: graph
@@ -411,53 +411,53 @@ class Graph:
 
             outputs[key] = new_output
 
-        return Graph.from_dict_with_node_arguments(data)
+        return Graph.from_json_with_node_arguments(data)
 
     @staticmethod
-    def from_dict_with_node_arguments(data: Dict) -> "Graph":
+    def from_json_with_node_arguments(data: Dict) -> "Graph":
         """
-        Create graph from graph dict with node arguments
+        Create graph from json serializable dictionary with node arguments
 
         :param data: graph dict with node arguments
         :return: graph
         """
 
-        def _graph_node_from_dict(data: Union[Dict, str]) -> Union[FunctionCall, "GraphCall"]:
+        def _graph_node_from_json(data: Union[Dict, str]) -> Union[FunctionCall, "GraphCall"]:
             if isinstance(data, dict) and "function" in data:
-                return FunctionCall.from_dict(data)
+                return FunctionCall.from_json(data)
             elif isinstance(data, dict) and "graph" in data:
-                return GraphCall.from_dict(data)
+                return GraphCall.from_json(data)
 
             raise ValueError(f"invalid graph node dict '{data}'")
 
         data = data.copy()
         return Graph(
-            consts={ConstKey(key=key): Const.from_dict(value) for key, value in data.pop("consts").items()},
+            consts={ConstKey(key=key): Const.from_json(value) for key, value in data.pop("consts").items()},
             inputs={
                 InputKey(key=key): cast(ConstKey, _get_key_from_str(value)) if value is not None else None
                 for key, value in data.pop("inputs").items()
             },
-            nodes={NodeKey(key=key): _graph_node_from_dict(value) for key, value in data.pop("nodes").items()},
+            nodes={NodeKey(key=key): _graph_node_from_json(value) for key, value in data.pop("nodes").items()},
             outputs={OutputKey(key=key): _get_key_from_str(value) for key, value in data.pop("outputs").items()},
             **data,
         )
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_json(self) -> Dict[str, Any]:
         """
-        Convert graph representation to serializable dictionary
+        Convert graph representation to json serializable dictionary
 
-        :return: graph dictionary
+        :return: json serializable dictionary
         """
         graph_dict: GraphDict = {"consts": {}, "inputs": {}, "nodes": {}, "edges": [], "outputs": {}}
 
         for const_node_key, const_node in self.consts.items():
-            graph_dict["consts"][const_node_key.key] = const_node.to_dict()
+            graph_dict["consts"][const_node_key.key] = const_node.to_json()
 
         for input_node_key, input_node in self.inputs.items():
             graph_dict["inputs"][input_node_key.key] = input_node.to_str() if input_node is not None else None
 
         for func_node_key, func_node in self.nodes.items():
-            func_node_dict = func_node.to_dict()
+            func_node_dict = func_node.to_json()
             func_node_dict.pop("args")
 
             graph_dict["nodes"][func_node_key.key] = func_node_dict
@@ -483,11 +483,11 @@ class Graph:
 
         return cast(dict, graph_dict)
 
-    def to_task_graph(self, *args, **kwargs) -> Tuple[Dict[str, Any], List[str]]:
+    def to_dict(self, *args, **kwargs) -> Tuple[Dict[str, Any], List[str]]:
         """
-        Convert graph to task graph
+        Convert graph to dict graph
 
-        Task graph representation:
+        Dict graph representation:
 
         .. code-block:: json
 
@@ -504,10 +504,10 @@ class Graph:
 
         :param args: positional arguments
         :param kwargs: keyword arguments
-        :return: task graph and output keys
+        :return: dict graph and output keys
         """
         inputs: dict = {**dict(zip((key.key for key in self.inputs.keys()), args)), **kwargs}
-        return self._convert_graph_to_task_graph(inputs=inputs)
+        return self._convert_graph_to_dict(inputs=inputs)
 
     def to_dask(self, *args, **kwargs) -> Tuple[Dict[str, Any], List[str]]:
         """
@@ -516,17 +516,17 @@ class Graph:
         .. warning::
 
             This method is deprecated and will be removed in a future release.
-            Please use :func:`to_task_graph` instead.
+            Please use :func:`to_dict` instead.
 
         :param args: positional arguments
         :param kwargs: keyword arguments
         :return: dask graph and output keys
         """
         warnings.warn(
-            "This method is deprecated and will be removed in a future release. Please use 'to_task_graph' instead.",
+            "This method is deprecated and will be removed in a future release. Please use 'to_dict' instead.",
             DeprecationWarning,
         )
-        return self.to_task_graph(*args, **kwargs)
+        return self.to_dict(*args, **kwargs)
 
     def to_dot(
         self,
@@ -813,29 +813,29 @@ class Graph:
 
         return edge
 
-    def _convert_graph_to_task_graph(
+    def _convert_graph_to_dict(
         self,
         inputs: Optional[Dict[str, Any]] = None,
         input_mapping: Optional[Dict[InputKey, str]] = None,
         output_mapping: Optional[Dict[OutputKey, str]] = None,
     ) -> Tuple[Dict[str, Any], List[str]]:
         """
-        Convert our own graph format to a task graph.
+        Convert our own graph format to a dict graph.
 
         :param inputs: inputs dictionary
         :param input_mapping: input mapping for subgraphs
         :param output_mapping: output mapping for subgraphs
-        :return: tuple containing task graph and targets
+        :return: tuple containing dict graph and targets
         """
         assert inputs is None or input_mapping is None, "cannot specify both inputs and input_mapping"
 
-        task_graph: dict = {}
+        dict_graph: dict = {}
         key_to_uuid: dict = {}
 
         # create constants
         for const_key, const in self.consts.items():
             graph_key = f"const_{self._get_const_label(const)}_{uuid.uuid4().hex}"
-            task_graph[graph_key] = const.to_value()
+            dict_graph[graph_key] = const.to_value()
             key_to_uuid[const_key] = graph_key
 
         # create inputs
@@ -843,7 +843,7 @@ class Graph:
             for input_key in self.inputs.keys():
                 graph_key = f"input_{input_key.key}_{uuid.uuid4().hex}"
                 # if input key is not in inputs, use the default value
-                task_graph[graph_key] = (
+                dict_graph[graph_key] = (
                     inputs[input_key.key] if input_key.key in inputs else self.consts[self.inputs[input_key]].to_value()
                 )
                 key_to_uuid[input_key] = graph_key
@@ -879,7 +879,7 @@ class Graph:
                 else:
                     key_to_uuid[input_key] = key_to_uuid[const_path]
 
-        # build task graph
+        # build dict graph
         for node_key, node in self.nodes.items():
             if isinstance(node, FunctionCall):
                 assert callable(node.function)
@@ -896,7 +896,7 @@ class Graph:
                         # handle default arguments
                         if param_name not in node.args:
                             graph_key = f"const_{self._get_const_label(input_annotation.default)}_{uuid.uuid4().hex}"
-                            task_graph[graph_key] = input_annotation.default
+                            dict_graph[graph_key] = input_annotation.default
                             args.append(graph_key)
                             continue
 
@@ -918,10 +918,10 @@ class Graph:
                         break
 
                     constant_key = f"const_{self._get_const_label(output_position)}_{uuid.uuid4().hex}"
-                    task_graph[constant_key] = output_position
-                    task_graph[graph_key] = (_unpack_tuple, node_uuid, constant_key)
+                    dict_graph[constant_key] = output_position
+                    dict_graph[graph_key] = (_unpack_tuple, node_uuid, constant_key)
 
-                task_graph[node_uuid] = (node.function,) + tuple(args)
+                dict_graph[node_uuid] = (node.function,) + tuple(args)
 
             elif isinstance(node, GraphCall):
                 new_input_mapping = {
@@ -931,12 +931,12 @@ class Graph:
                     output_key: key_to_uuid[NodeOutputKey(key=node_key.key, output=output_key.key)]
                     for output_key in node.graph.outputs
                 }
-                task_subgraph, _ = node.graph._convert_graph_to_task_graph(
+                dict_subgraph, _ = node.graph._convert_graph_to_dict(
                     input_mapping=new_input_mapping, output_mapping=new_output_mapping
                 )
-                task_graph.update(task_subgraph)
+                dict_graph.update(dict_subgraph)
 
-        return task_graph, [key_to_uuid[output_path] for output_path in self.outputs.values()]
+        return dict_graph, [key_to_uuid[output_path] for output_path in self.outputs.values()]
 
     def _scramble_keys(
         self, old_to_new: Optional[bidict[Union[ConstKey, NodeKey], Union[ConstKey, NodeKey]]] = None
