@@ -483,16 +483,50 @@ class Graph:
 
         return cast(dict, graph_dict)
 
+    def to_task_graph(self, *args, **kwargs) -> Tuple[Dict[str, Any], List[str]]:
+        """
+        Convert graph to task graph
+
+        Task graph representation:
+
+        .. code-block:: json
+
+            {
+              "a": 1,
+              "b": 2,
+              "sum": (add, "a", "b")
+            }
+
+        Values can be:
+
+        - Tasks: represented as tuples with the format ``(fn, *args)``
+        - Constants: all other values
+
+        :param args: positional arguments
+        :param kwargs: keyword arguments
+        :return: task graph and output keys
+        """
+        inputs: dict = {**dict(zip((key.key for key in self.inputs.keys()), args)), **kwargs}
+        return self._convert_graph_to_task_graph(inputs=inputs)
+
     def to_dask(self, *args, **kwargs) -> Tuple[Dict[str, Any], List[str]]:
         """
         Convert graph to dask graph
+
+        .. warning::
+
+            This method is deprecated and will be removed in a future release.
+            Please use :func:`to_task_graph` instead.
 
         :param args: positional arguments
         :param kwargs: keyword arguments
         :return: dask graph and output keys
         """
-        inputs: dict = {**dict(zip(self.inputs.keys(), args)), **kwargs}
-        return self._convert_graph_to_dask_graph(inputs=inputs)
+        warnings.warn(
+            "This method is deprecated and will be removed in a future release. Please use 'to_task_graph' instead.",
+            DeprecationWarning,
+        )
+        return self.to_task_graph(*args, **kwargs)
 
     def to_dot(
         self,
@@ -779,29 +813,29 @@ class Graph:
 
         return edge
 
-    def _convert_graph_to_dask_graph(
+    def _convert_graph_to_task_graph(
         self,
         inputs: Optional[Dict[str, Any]] = None,
         input_mapping: Optional[Dict[InputKey, str]] = None,
         output_mapping: Optional[Dict[OutputKey, str]] = None,
     ) -> Tuple[Dict[str, Any], List[str]]:
         """
-        Convert our own graph format to a dask graph.
+        Convert our own graph format to a task graph.
 
         :param inputs: inputs dictionary
         :param input_mapping: input mapping for subgraphs
         :param output_mapping: output mapping for subgraphs
-        :return: tuple containing dask graph and targets
+        :return: tuple containing task graph and targets
         """
         assert inputs is None or input_mapping is None, "cannot specify both inputs and input_mapping"
 
-        dask_graph: dict = {}
+        task_graph: dict = {}
         key_to_uuid: dict = {}
 
         # create constants
         for const_key, const in self.consts.items():
             graph_key = f"const_{self._get_const_label(const)}_{uuid.uuid4().hex}"
-            dask_graph[graph_key] = const.to_value()
+            task_graph[graph_key] = const.to_value()
             key_to_uuid[const_key] = graph_key
 
         # create inputs
@@ -809,7 +843,7 @@ class Graph:
             for input_key in self.inputs.keys():
                 graph_key = f"input_{input_key.key}_{uuid.uuid4().hex}"
                 # if input key is not in inputs, use the default value
-                dask_graph[graph_key] = (
+                task_graph[graph_key] = (
                     inputs[input_key.key] if input_key.key in inputs else self.consts[self.inputs[input_key]].to_value()
                 )
                 key_to_uuid[input_key] = graph_key
@@ -845,7 +879,7 @@ class Graph:
                 else:
                     key_to_uuid[input_key] = key_to_uuid[const_path]
 
-        # build dask graph
+        # build task graph
         for node_key, node in self.nodes.items():
             if isinstance(node, FunctionCall):
                 assert callable(node.function)
@@ -862,7 +896,7 @@ class Graph:
                         # handle default arguments
                         if param_name not in node.args:
                             graph_key = f"const_{self._get_const_label(input_annotation.default)}_{uuid.uuid4().hex}"
-                            dask_graph[graph_key] = input_annotation.default
+                            task_graph[graph_key] = input_annotation.default
                             args.append(graph_key)
                             continue
 
@@ -884,10 +918,10 @@ class Graph:
                         break
 
                     constant_key = f"const_{self._get_const_label(output_position)}_{uuid.uuid4().hex}"
-                    dask_graph[constant_key] = output_position
-                    dask_graph[graph_key] = (_unpack_tuple, node_uuid, constant_key)
+                    task_graph[constant_key] = output_position
+                    task_graph[graph_key] = (_unpack_tuple, node_uuid, constant_key)
 
-                dask_graph[node_uuid] = (node.function,) + tuple(args)
+                task_graph[node_uuid] = (node.function,) + tuple(args)
 
             elif isinstance(node, GraphCall):
                 new_input_mapping = {
@@ -897,12 +931,12 @@ class Graph:
                     output_key: key_to_uuid[NodeOutputKey(key=node_key.key, output=output_key.key)]
                     for output_key in node.graph.outputs
                 }
-                dask_subgraph, _ = node.graph._convert_graph_to_dask_graph(
+                task_subgraph, _ = node.graph._convert_graph_to_task_graph(
                     input_mapping=new_input_mapping, output_mapping=new_output_mapping
                 )
-                dask_graph.update(dask_subgraph)
+                task_graph.update(task_subgraph)
 
-        return dask_graph, [key_to_uuid[output_path] for output_path in self.outputs.values()]
+        return task_graph, [key_to_uuid[output_path] for output_path in self.outputs.values()]
 
     def _scramble_keys(
         self, old_to_new: Optional[bidict[Union[ConstKey, NodeKey], Union[ConstKey, NodeKey]]] = None

@@ -39,11 +39,11 @@ class GraphEngine:
         """
         self.backend = backend
 
-    def get(self, dsk: Dict, keys: Any, **kwargs) -> Any:
+    def get(self, graph: Dict, keys: Any, **kwargs) -> Any:
         """
         Compute task graph
 
-        :param dsk: dask-compatible task graph
+        :param graph: task graph
         :param keys: keys to compute (e.g. ``"x"``, ``["x", "y", "z"]``, etc)
         :param kwargs: keyword arguments to forward to the parallel backend
         :return: results in the same structure as keys
@@ -51,11 +51,11 @@ class GraphEngine:
         keyset = set(self._flatten_iter([keys]))
 
         # cull graph to remove any unnecessary dependencies
-        graphlib_graph = self._cull_graph(self._convert_dsk_to_graph(dsk), keyset)
+        graphlib_graph = self._cull_graph(self._get_graph_dependencies(graph), keyset)
         ref_count_graph = self._create_ref_count_graph(graphlib_graph)
 
-        graph = TopologicalSorter(graphlib_graph)
-        graph.prepare()
+        topological_sorter = TopologicalSorter(graphlib_graph)
+        topological_sorter.prepare()
 
         results: Dict[Hashable, Any] = {}
         future_to_key: Dict[Future[Any], Hashable] = {}
@@ -95,14 +95,14 @@ class GraphEngine:
                 future_to_key.pop(done_future, None)
                 done_keys.append(key)
 
-            graph.done(*done_keys)
+            topological_sorter.done(*done_keys)
             for done_key in done_keys:
                 dereference_key(done_key)
 
         # while there are still unscheduled tasks
-        while graph.is_active():
+        while topological_sorter.is_active():
             # get in vertices
-            in_keys = graph.get_ready()
+            in_keys = topological_sorter.get_ready()
 
             # if there are no in-vertices, wait for a future to resolve
             # IMPORTANT: we make the assumption that the graph is acyclic
@@ -111,7 +111,7 @@ class GraphEngine:
                 continue
 
             for in_key in in_keys:
-                computation = dsk[in_key]
+                computation = graph[in_key]
 
                 if self._is_submittable_function_computation(computation):
                     future = self._submit_function_computation(computation, results, **kwargs)
@@ -119,7 +119,7 @@ class GraphEngine:
                 else:
                     result = self._evaluate_computation(computation, results)
                     results[in_key] = result
-                    graph.done(in_key)
+                    topological_sorter.done(in_key)
                     dereference_key(in_key)
 
         # resolve all pending futures
@@ -183,8 +183,8 @@ class GraphEngine:
         return computation
 
     @staticmethod
-    def _convert_dsk_to_graph(dsk: Dict) -> Dict:
-        keys = set(dsk.keys())
+    def _get_graph_dependencies(graph: Dict) -> Dict:
+        keys = set(graph.keys())
 
         def flatten(value: Any) -> Set[Any]:
             # handle tasks as tuples
@@ -209,7 +209,7 @@ class GraphEngine:
 
             return set()
 
-        return {key: flatten(value) for key, value in dsk.items()}
+        return {key: flatten(value) for key, value in graph.items()}
 
     @staticmethod
     def _create_ref_count_graph(graph: Dict) -> Dict:
