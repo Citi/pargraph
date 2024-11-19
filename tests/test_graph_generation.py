@@ -30,7 +30,31 @@ class TestGraphGeneration(unittest.TestCase):
             return add(add(w, x), add(y, z))
 
         self.assertEqual(
-            self.engine.get(*sample_graph.to_graph().to_dask(w=1, x=2, y=3, z=4))[0], sample_graph(w=1, x=2, y=3, z=4)
+            self.engine.get(*sample_graph.to_graph().to_dict(w=1, x=2, y=3, z=4))[0], sample_graph(w=1, x=2, y=3, z=4)
+        )
+
+    def test_task_graph_positional_arguments(self):
+        @delayed
+        def add(x: int, y: int) -> int:
+            return x + y
+
+        @graph
+        def sample_graph(w: int, x: int, y: int, z: int) -> int:
+            return add(add(w, x), add(y, z))
+
+        self.assertEqual(self.engine.get(*sample_graph.to_graph().to_dict(1, 2, 3, 4))[0], sample_graph(1, 2, 3, 4))
+
+    def test_task_graph_positional_and_keyword_arguments(self):
+        @delayed
+        def add(x: int, y: int) -> int:
+            return x + y
+
+        @graph
+        def sample_graph(w: int, x: int, y: int, z: int) -> int:
+            return add(add(w, x), add(y, z))
+
+        self.assertEqual(
+            self.engine.get(*sample_graph.to_graph().to_dict(1, 2, y=3, z=4))[0], sample_graph(1, 2, y=3, z=4)
         )
 
     def test_subgraph(self):
@@ -47,7 +71,7 @@ class TestGraphGeneration(unittest.TestCase):
             return sample_subgraph(sample_subgraph(w, x), sample_subgraph(y, z))
 
         self.assertEqual(
-            self.engine.get(*sample_graph.to_graph().to_dask(w=1, x=2, y=3, z=4))[0], sample_graph(w=1, x=2, y=3, z=4)
+            self.engine.get(*sample_graph.to_graph().to_dict(w=1, x=2, y=3, z=4))[0], sample_graph(w=1, x=2, y=3, z=4)
         )
 
     def test_basic_partial(self):
@@ -60,7 +84,7 @@ class TestGraphGeneration(unittest.TestCase):
             return add(add(w, x), add(y, z))
 
         self.assertEqual(
-            self.engine.get(*sample_graph.to_graph(w=1, x=2).to_dask(y=3, z=4))[0], sample_graph(w=1, x=2, y=3, z=4)
+            self.engine.get(*sample_graph.to_graph(w=1, x=2).to_dict(y=3, z=4))[0], sample_graph(w=1, x=2, y=3, z=4)
         )
 
     def test_variadic_arguments(self):
@@ -72,7 +96,7 @@ class TestGraphGeneration(unittest.TestCase):
         def sample_graph(w: int, x: int, y: int, z: int) -> int:
             return add(w, x, y, z)
 
-        self.assertEqual(self.engine.get(*sample_graph.to_graph().to_dask(w=1, x=2, y=3, z=4))[0], add(1, 2, 3, 4))
+        self.assertEqual(self.engine.get(*sample_graph.to_graph().to_dict(w=1, x=2, y=3, z=4))[0], add(1, 2, 3, 4))
 
     def test_operator_override(self):
         @graph
@@ -80,7 +104,7 @@ class TestGraphGeneration(unittest.TestCase):
             return (w + x) + (y + z)
 
         self.assertEqual(
-            self.engine.get(*sample_graph.to_graph().to_dask(w=1, x=2, y=3, z=4))[0], sample_graph(w=1, x=2, y=3, z=4)
+            self.engine.get(*sample_graph.to_graph().to_dict(w=1, x=2, y=3, z=4))[0], sample_graph(w=1, x=2, y=3, z=4)
         )
 
     def test_operator_override_complex(self):
@@ -89,7 +113,7 @@ class TestGraphGeneration(unittest.TestCase):
             phi = (1 + 5**0.5) / 2
             return round(((phi**n) + ((1 - phi) ** n)) / 5**0.5)
 
-        self.assertEqual(self.engine.get(*fibonacci.to_graph().to_dask(n=6))[0], fibonacci(n=6))
+        self.assertEqual(self.engine.get(*fibonacci.to_graph().to_dict(n=6))[0], fibonacci(n=6))
 
     def test_getitem(self):
         @delayed
@@ -100,7 +124,7 @@ class TestGraphGeneration(unittest.TestCase):
         def sample_graph(x: int, y: int) -> int:
             return return_tuple(x, y)[0]
 
-        self.assertEqual(self.engine.get(*sample_graph.to_graph().to_dask(x=1, y=2))[0], sample_graph(x=1, y=2))
+        self.assertEqual(self.engine.get(*sample_graph.to_graph().to_dict(x=1, y=2))[0], sample_graph(x=1, y=2))
 
     @unittest.skipIf(not PANDAS_INSTALLED, "pandas must be installed")
     def test_call(self):
@@ -111,7 +135,7 @@ class TestGraphGeneration(unittest.TestCase):
             return s.sum()
 
         self.assertEqual(
-            self.engine.get(*sample_graph.to_graph().to_dask(s=pd.Series([1, 2, 3])))[0],
+            self.engine.get(*sample_graph.to_graph().to_dict(s=pd.Series([1, 2, 3])))[0],
             sample_graph(s=pd.Series([1, 2, 3])),
         )
 
@@ -124,7 +148,7 @@ class TestGraphGeneration(unittest.TestCase):
             return s[s > s.mean()]
 
         pd.testing.assert_series_equal(
-            self.engine.get(*sample_graph.to_graph().to_dask(s=pd.Series([1, 2, 3])))[0],
+            self.engine.get(*sample_graph.to_graph().to_dict(s=pd.Series([1, 2, 3])))[0],
             sample_graph(s=pd.Series([1, 2, 3])),
         )
 
@@ -138,7 +162,7 @@ class TestGraphGeneration(unittest.TestCase):
 
         pd.testing.assert_frame_equal(
             self.engine.get(
-                *sample_graph.to_graph().to_dask(
+                *sample_graph.to_graph().to_dict(
                     df1=pd.DataFrame({"a": ["foo", "bar"], "b": [1, 2]}),
                     df2=pd.DataFrame({"a": ["foo", "baz"], "c": [3, 4]}),
                 )
@@ -163,7 +187,7 @@ class TestGraphGeneration(unittest.TestCase):
         )
 
         self.assertEqual(
-            self.engine.get(*sample_graph.to_graph().explode_subgraphs().to_dask(w=1, x=2, y=3, z=4))[0],
+            self.engine.get(*sample_graph.to_graph().explode_subgraphs().to_dict(w=1, x=2, y=3, z=4))[0],
             sample_graph(w=1, x=2, y=3, z=4),
         )
 
@@ -177,12 +201,12 @@ class TestGraphGeneration(unittest.TestCase):
             return add(add(w, x), add(y, z))
 
         self.assertNotEqual(
-            json.dumps(sample_graph.to_graph().to_dict()), json.dumps(sample_graph.to_graph().to_dict())
+            json.dumps(sample_graph.to_graph().to_json()), json.dumps(sample_graph.to_graph().to_json())
         )
 
         self.assertEqual(
-            json.dumps(sample_graph.to_graph().stabilize().to_dict()),
-            json.dumps(sample_graph.to_graph().stabilize().to_dict()),
+            json.dumps(sample_graph.to_graph().stabilize().to_json()),
+            json.dumps(sample_graph.to_graph().stabilize().to_json()),
         )
 
     def test_valid_delayed_signature(self):
@@ -271,25 +295,25 @@ class TestGraphGeneration(unittest.TestCase):
         def sample_graph(x: int, y: int = 1) -> int:
             return x + y
 
-        self.assertEqual(self.engine.get(*sample_graph.to_graph().to_dask(x=2, y=3))[0], sample_graph(x=2, y=3))
+        self.assertEqual(self.engine.get(*sample_graph.to_graph().to_dict(x=2, y=3))[0], sample_graph(x=2, y=3))
 
     def test_graph_default_argument_missing(self):
         @graph
         def sample_graph(x: int, y: int = 1) -> int:
             return x + y
 
-        self.assertEqual(self.engine.get(*sample_graph.to_graph().to_dask(x=2))[0], sample_graph(x=2))
+        self.assertEqual(self.engine.get(*sample_graph.to_graph().to_dict(x=2))[0], sample_graph(x=2))
 
     def test_function_default_argument(self):
         @graph
         def add(x: int, y: int = 1) -> int:
             return x + y
 
-        self.assertEqual(self.engine.get(*add.to_graph().to_dask(x=2, y=3))[0], add(x=2, y=3))
+        self.assertEqual(self.engine.get(*add.to_graph().to_dict(x=2, y=3))[0], add(x=2, y=3))
 
     def test_function_default_argument_missing(self):
         @graph
         def add(x: int, y: int = 1) -> int:
             return x + y
 
-        self.assertEqual(self.engine.get(*add.to_graph().to_dask(x=2))[0], add(x=2))
+        self.assertEqual(self.engine.get(*add.to_graph().to_dict(x=2))[0], add(x=2))
