@@ -16,6 +16,7 @@
     <a href="https://pypi.org/project/pargraph/">
       <img alt="PyPI - Version" src="https://img.shields.io/pypi/v/pargraph?colorA=0f1632&colorB=255be3">
     </a>
+    <img src="https://api.securityscorecards.dev/projects/github.com/Citi/pargraph/badge">
   </p>
 </div>
 
@@ -126,14 +127,14 @@ map_reduce_sort_recursive.to_graph(partition_counts=4).to_dot().write_png("map_r
 
 ![Map-Reduce Sort Recursive](docs/_static/map_reduce_sort_recursive.png)
 
-Use the `to_dask` method to convert the generated graph to a Dask task graph.
+Use the `to_dict` method to convert the generated graph to a dict graph.
 
 ```python
 import numpy as np
 from distributed import Client
 
 with Client() as client:
-    client.get(map_reduce_sort.to_graph(partition_count=4).to_dask(array=np.random.rand(20)))[0]
+    client.get(map_reduce_sort.to_graph(partition_count=4).to_dict(array=np.random.rand(20)))[0]
 
 # [0.06253707 0.06795382 0.11492823 0.14512393 0.20183152 0.41109117
 #  0.42613798 0.45156214 0.4714821  0.54000373 0.54902451 0.62671881
