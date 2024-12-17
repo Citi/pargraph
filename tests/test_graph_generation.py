@@ -317,3 +317,11 @@ class TestGraphGeneration(unittest.TestCase):
             return x + y
 
         self.assertEqual(self.engine.get(*add.to_graph().to_dict(x=2))[0], add(x=2))
+
+    def test_missing_input(self):
+        @graph
+        def add(x: int, y: int) -> int:
+            return x + y
+
+        with self.assertRaises(ValueError):
+            add.to_graph().to_dict(x=2)

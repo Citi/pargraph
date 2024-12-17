@@ -843,9 +843,13 @@ class Graph:
             for input_key in self.inputs.keys():
                 graph_key = f"input_{input_key.key}_{uuid.uuid4().hex}"
                 # if input key is not in inputs, use the default value
-                dict_graph[graph_key] = (
-                    inputs[input_key.key] if input_key.key in inputs else self.consts[self.inputs[input_key]].to_value()
-                )
+                if input_key.key in inputs:
+                    dict_graph[graph_key] = inputs[input_key.key]
+                elif self.inputs[input_key] is not None:
+                    dict_graph[graph_key] = self.consts[self.inputs[input_key]].to_value()
+                else:
+                    raise ValueError(f"input '{input_key.key}' not found in provided inputs")
+
                 key_to_uuid[input_key] = graph_key
 
         # assign random keys to all node paths and node output paths beforehand
