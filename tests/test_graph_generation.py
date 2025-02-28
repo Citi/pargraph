@@ -173,6 +173,21 @@ class TestGraphGeneration(unittest.TestCase):
             ),
         )
 
+    def test_boolean(self):
+        @delayed
+        def is_even(value: int) -> bool:
+            return value % 2 == 0
+
+        @delayed
+        def is_positive(value: int) -> bool:
+            return value >= 0
+
+        @graph
+        def invalid_graph(value: int) -> bool:
+            return is_even(value) or is_positive(value)
+
+        self.assertRaises(TypeError, invalid_graph.to_graph)
+
     def test_explode_subgraphs(self):
         @graph
         def sample_subgraph(x: int, y: int) -> int:

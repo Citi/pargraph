@@ -84,6 +84,14 @@ class GraphContext:
 
         return call(self, len(args), *args, *itertools.chain(*kwargs.items()))
 
+    def __bool__(self) -> bool:
+        # As Python does not allow the overloading of its and/or/not operators, we cannot implement
+        # our graph deduction mechanism on these.
+        # This implementation of __bool__ provides a more insightful error message when these
+        # operators are used on Pargraph functions.
+        # More info: https://peps.python.org/pep-0335/
+        raise TypeError("Pargraph does not support the use of boolean (and/or/not) operators.")
+
 
 def external_input() -> GraphContext:
     """
@@ -367,8 +375,10 @@ def _generate_graph(func: Callable, /, *args, **kwargs):
 # __hash__() is not included because since Python 3.3 hash randomization is enabled by default yielding impure hashes
 # between isolated instances making it not suitable for out-of-core computations
 # More info: https://docs.python.org/3/reference/datamodel.html#object.__hash__
+#
+# __bool__() has a specific implementation, as Python does not support the overloading of its and/or operators (see
+# GraphContext.__bool__ here-above).
 for op in {
-    bool,
     int,
     float,
     complex,
