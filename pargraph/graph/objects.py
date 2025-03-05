@@ -845,11 +845,11 @@ class Graph:
                 child_node = self.nodes[child_key]
 
                 # Check if parent and child nodes are function calls
-                if not isinstance(parent_node, FunctionCall) or not isinstance(child_node, FunctionCall):
+                if not (isinstance(parent_node, FunctionCall) and isinstance(child_node, FunctionCall)):
                     continue
 
                 # Check if parent and child nodes are callable
-                if not isinstance(parent_node.function, Callable) or not isinstance(child_node.function, Callable):
+                if not (callable(parent_node.function) and callable(child_node.function)):
                     warnings.warn("Cannot fuse non-callable nodes", stacklevel=2)
                     continue
 
@@ -862,7 +862,7 @@ class Graph:
 
                 def outer(_parent_node, _child_node):
                     parent_output_names = _get_output_names(_parent_node.function)
-                    child_function_annotation = inspect.signature(child_node.function)
+                    child_function_annotation = inspect.signature(cast(Callable, child_node.function))
 
                     def inner(*args, **kwargs):
                         result = _parent_node.function(*args, **kwargs)
@@ -1205,11 +1205,11 @@ class Graph:
         def decorator(target_fn: Callable):
             param_sig = inspect.signature(source_param_fn)
             return_sig = inspect.signature(source_return_fn)
-            
+
             new_params = list(param_sig.parameters.values())
             new_sig = inspect.Signature(parameters=new_params, return_annotation=return_sig.return_annotation)
 
-            target_fn.__signature__ = new_sig
+            target_fn.__signature__ = new_sig  # type: ignore[attr-defined]
 
             return target_fn
 
