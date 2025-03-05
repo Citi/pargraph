@@ -811,7 +811,7 @@ class Graph:
         Fuse sequential nodes in the graph. This is useful for combining implicit nodes into a single node for a simpler
         graph and better performance.
 
-        Output nodes are not fused and unused Const nodes are removed.
+        Output nodes are not fused.
 
         Example:
 
