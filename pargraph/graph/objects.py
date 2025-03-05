@@ -7,7 +7,21 @@ import uuid
 import warnings
 from collections import defaultdict, deque
 from dataclasses import dataclass
-from typing import Any, Callable, DefaultDict, Dict, List, Literal, Optional, Tuple, TypedDict, Union, cast, Iterator
+from typing import (
+    Any,
+    Callable,
+    DefaultDict,
+    Dict,
+    List,
+    Literal,
+    Optional,
+    Tuple,
+    TypedDict,
+    Union,
+    cast,
+    Iterator,
+    Set,
+)
 
 import cloudpickle
 import jsonschema
@@ -792,6 +806,131 @@ class Graph:
 
         return self
 
+    def fuse_sequential(self, depth: int = -1) -> "Graph":
+        """
+        Fuse sequential nodes in the graph. This is useful for combining implicit nodes into a single node for a simpler
+        graph and better performance.
+
+        Output nodes are not fused.
+
+        Example:
+
+        A -> B -> C -> D -> E becomes A -> F -> E where F = B(C(D))
+
+        .. note::
+
+            This method mutates the graph
+
+        :param depth: depth to fuse sequential nodes in subgraphs, default is -1 (fuse nodes in all subgraphs)
+        :return: fused graph
+        """
+        # This algorithm is a bit slow but it works. Loop until no more fusions can be made
+        while True:
+            inverted_dependency_graph = self._get_inverted_graphlib_dependency_graph()
+
+            for parent_key, child_keys in inverted_dependency_graph.items():
+                # Check if parent node is an output don't fuse
+                if any(
+                    isinstance(output, NodeOutputKey) and output.key == parent_key for output in self.outputs.values()
+                ):
+                    continue
+
+                # Check if parent node is a dependency for only one child node
+                if len(child_keys) != 1:
+                    continue
+
+                child_key = next(iter(child_keys))
+
+                parent_node = self.nodes[parent_key]
+                child_node = self.nodes[child_key]
+
+                # Check if parent and child nodes are function calls
+                if not (isinstance(parent_node, FunctionCall) and isinstance(child_node, FunctionCall)):
+                    continue
+
+                # Check if parent and child nodes are callable
+                if not (callable(parent_node.function) and callable(child_node.function)):
+                    warnings.warn("Cannot fuse non-callable nodes", stacklevel=2)
+                    continue
+
+                # Check if all arguments of child node are outputs of parent node or constants
+                if not all(
+                    isinstance(arg, ConstKey) or isinstance(arg, NodeOutputKey) and NodeKey(arg.key) == parent_key
+                    for arg in child_node.args.values()
+                ):
+                    continue
+
+                def outer(_parent_node, _child_node):
+                    parent_output_names = _get_output_names(_parent_node.function)
+                    child_function_annotation = inspect.signature(cast(Callable, child_node.function))
+
+                    def inner(*args, **kwargs):
+                        result = _parent_node.function(*args, **kwargs)
+
+                        if isinstance(parent_output_names, tuple):
+                            result_map = dict(zip(parent_output_names, result))
+                        else:
+                            result_map = {parent_output_names: result}
+
+                        return (
+                            _child_node.function(
+                                *[
+                                    (
+                                        self.consts[child_arg].to_value()
+                                        if isinstance(child_arg, ConstKey)
+                                        else result_map[child_arg.output]
+                                    )
+                                    for child_arg in _child_node.args.values()
+                                ]
+                            )
+                            if next(iter(child_function_annotation.parameters.values())).kind
+                            == inspect.Parameter.VAR_POSITIONAL
+                            else _child_node.function(
+                                **{
+                                    param: (
+                                        self.consts[child_arg].to_value()
+                                        if isinstance(child_arg, ConstKey)
+                                        else result_map[child_arg.output]
+                                    )
+                                    for param, child_arg in _child_node.args.items()
+                                }
+                            )
+                        )
+
+                    return inner
+
+                self.nodes[parent_key] = FunctionCall(
+                    function=self._copy_signature_and_returns(parent_node.function, child_node.function)(
+                        outer(parent_node, child_node)
+                    ),
+                    args=parent_node.args,
+                )
+
+                child_output_names = _get_output_names(child_node.function)
+                child_output_names = (
+                    child_output_names if isinstance(child_output_names, tuple) else (child_output_names,)
+                )
+
+                # Remove child node and replace its outputs with parent node outputs
+                self._replace_nodes(
+                    {
+                        NodeOutputKey(child_key.key, output_name): NodeOutputKey(parent_key.key, output_name)
+                        for output_name in child_output_names
+                    }
+                )
+                self.nodes.pop(child_key)
+
+                break
+
+            else:
+                break
+
+        for node_key, node in list(self.nodes.items()):
+            if isinstance(node, GraphCall) and (depth > 1 or depth == -1):
+                node.graph.fuse_sequential(depth=depth - 1 if depth > 0 else -1)
+
+        return self
+
     @staticmethod
     def _create_dot_edge(src: str, dst: str) -> pydot.Edge:
         """
@@ -1035,6 +1174,21 @@ class Graph:
 
         return self
 
+    def _get_inverted_graphlib_dependency_graph(self) -> Dict[NodeKey, Set[NodeKey]]:
+        """
+        Get inverted graphlib dependency graph
+
+        :return: inverted graphlib dependency graph
+        """
+        graph = defaultdict(set)
+
+        for node_key, node in self.nodes.items():
+            for arg in node.args.values():
+                if isinstance(arg, NodeOutputKey):
+                    graph[NodeKey(arg.key)].add(node_key)
+
+        return graph
+
     @staticmethod
     def _get_const_label(value: Any) -> str:
         if isinstance(value, (int, float, bool, str)) or value is None:
@@ -1045,6 +1199,21 @@ class Graph:
     @staticmethod
     def _get_function_name(function: Union[str, Callable]) -> str:
         return function.__name__ if callable(function) else function
+
+    @staticmethod
+    def _copy_signature_and_returns(source_param_fn: Callable, source_return_fn: Callable):
+        def decorator(target_fn: Callable):
+            param_sig = inspect.signature(source_param_fn)
+            return_sig = inspect.signature(source_return_fn)
+
+            new_params = list(param_sig.parameters.values())
+            new_sig = inspect.Signature(parameters=new_params, return_annotation=return_sig.return_annotation)
+
+            target_fn.__signature__ = new_sig  # type: ignore[attr-defined]
+
+            return target_fn
+
+        return decorator
 
 
 def _unpack_tuple(graph_key: tuple, index: int) -> Any:
