@@ -1,9 +1,10 @@
 import json
 import unittest
+from types import SimpleNamespace
 from typing import Any, Dict, List
 
 from pargraph import GraphEngine, delayed, graph
-from pargraph.graph.objects import FunctionCall
+from pargraph.graph.objects import FunctionCall, Graph
 
 try:
     import pandas as pd  # noqa
@@ -223,6 +224,38 @@ class TestGraphGeneration(unittest.TestCase):
             json.dumps(sample_graph.to_graph().stabilize().to_json()),
             json.dumps(sample_graph.to_graph().stabilize().to_json()),
         )
+
+    def test_cull(self):
+        @delayed
+        def add(x: int, y: int) -> int:
+            return x + y
+
+        @graph
+        def sample_graph(w: int, x: int, y: int, z: int) -> int:
+            return add(add(w, x), add(y, z))
+
+        generated_graph = sample_graph.to_graph()
+        generated_graph = Graph(
+            consts=generated_graph.consts, inputs=generated_graph.inputs, nodes=generated_graph.nodes, outputs={}
+        )
+
+        self.assertEqual(len(generated_graph.cull().nodes), 0)
+
+    def test_fuse_sequential(self):
+        @graph
+        def attr_access(a: SimpleNamespace) -> int:
+            return a.b.c.d.e
+
+        self.assertEqual(
+            self.engine.get(
+                *attr_access.to_graph()
+                .fuse_sequential()
+                .to_dict(a=SimpleNamespace(b=SimpleNamespace(c=SimpleNamespace(d=SimpleNamespace(e=1)))))
+            )[0],
+            attr_access(a=SimpleNamespace(b=SimpleNamespace(c=SimpleNamespace(d=SimpleNamespace(e=1))))),
+        )
+
+        self.assertLess(len(attr_access.to_graph().fuse_sequential().nodes), len(attr_access.to_graph().nodes))
 
     def test_valid_delayed_signature(self):
         @delayed

@@ -62,6 +62,8 @@ class GraphContext:
         if item.startswith("__"):
             raise AttributeError(f"Attribute {item} not found")
 
+        warnings.warn("Accessing attributes on a GraphContext object is not recommended", stacklevel=2)
+
         def _getattr(self, item) -> Any:
             return getattr(self, item)
 
