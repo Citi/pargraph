@@ -56,13 +56,13 @@ jobs:
             PYTHONPATH=. python "$file"
           done
 
+      - name: Run notebook example
+        run: |
+          jupyter nbconvert --to script docs/source/walkthrough.ipynb
+          PYTHONPATH=. python docs/source/walkthrough.py
+
       - name: Test the documentation examples
         run: |
           pip install -r docs/requirements.txt
           cd docs
           make doctest
-
-      - name: Run notebook example
-        run: |
-          jupyter nbconvert --to script docs/source/walkthrough.ipynb
-          PYTHONPATH=. python docs/source/walkthrough.py
