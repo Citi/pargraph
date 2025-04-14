@@ -29,9 +29,9 @@ def add(*args):
 @delayed
 def collect_result(*results):
     """
-    Collect results into a pandas Series, using every other element as the index and the remaining elements as the values.
+    Collect results, using every other element as the index and the remaining elements as the values.
 
-    :param results: A variable number of arguments where even-indexed elements are used as the index and odd-indexed elements as the values
+    :param results: Arguments where even-indexed elements are used as the index and odd-indexed elements as the values
     :return: A pandas Series with the specified index and values
     """
     return pd.Series(results[1::2], index=results[0::2])
