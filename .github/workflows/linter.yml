@@ -30,8 +30,11 @@ jobs:
         with:
           python-version: "3.8"
 
-      - name: Setup Graphviz
-        uses: ts-graphviz/setup-graphviz@v2
+      - name: Install Graphviz
+        run: sudo apt install -y graphviz
+
+      - name: Install Pandoc
+        run: sudo apt install -y pandoc
 
       - name: Install dependencies
         run: |
