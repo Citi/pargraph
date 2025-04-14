@@ -58,6 +58,7 @@ jobs:
 
       - name: Run notebook example
         run: |
+          pip install jupyter
           jupyter nbconvert --to script docs/source/walkthrough.ipynb
           PYTHONPATH=. python docs/source/walkthrough.py
 
