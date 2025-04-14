@@ -10,6 +10,9 @@
   </p>
 
   <p align="center">
+    <a href="https://citi.github.io/pargraph/">
+      <img src="https://img.shields.io/badge/Documentation-0f1632">
+    </a>
     <a href="./LICENSE">
         <img src="https://img.shields.io/github/license/citi/pargraph?label=license&colorA=0f1632&colorB=255be3">
     </a>
@@ -98,7 +101,7 @@ Use the `to_graph` method to generate a graph representation of the function.
 map_reduce_sort.to_graph(partition_count=4).to_dot().write_png("map_reduce_sort.png")
 ```
 
-![Map-Reduce Sort](docs/_static/map_reduce_sort.png)
+![Map-Reduce Sort](docs/source/_static/map_reduce_sort.png)
 
 Moreover, you can compose graph functions with other graph functions to generate ever more complex graphs.
 
@@ -125,7 +128,7 @@ def map_reduce_sort_recursive(
 map_reduce_sort_recursive.to_graph(partition_counts=4).to_dot().write_png("map_reduce_sort_recursive.png")
 ```
 
-![Map-Reduce Sort Recursive](docs/_static/map_reduce_sort_recursive.png)
+![Map-Reduce Sort Recursive](docs/source/_static/map_reduce_sort_recursive.png)
 
 Use the `to_dict` method to convert the generated graph to a dict graph.
 
