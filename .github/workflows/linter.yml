@@ -42,3 +42,14 @@ jobs:
       - name: Run python unittest
         run: |
           python -m unittest discover -v tests
+      - name: Run the examples
+        run: |
+          find examples -type f -name '*.py' ! -name '__init__.py' | while read -r file; do
+            echo "Running $file"
+            PYTHONPATH=. python "$file"
+          done
+      - name: Test the documentation examples
+        run: |
+          pip install -r docs/requirements.txt
+          cd docs
+          make doctest
