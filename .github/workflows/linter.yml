@@ -50,6 +50,7 @@ jobs:
 
       - name: Run the examples
         run: |
+          pip install pandas numpy
           find examples -type f -name '*.py' ! -name '__init__.py' | while read -r file; do
             echo "Running $file"
             PYTHONPATH=. python "$file"
