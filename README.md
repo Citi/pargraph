@@ -150,12 +150,10 @@ with Client() as client:
 
 ## Graph scheduler
 
-Pargraph brings graph parallelization to parallel backends that may not support it out of the box. Think of it as a mini
-graph scheduler that lives in your program/application and sends out tasks concurrently to a parallel backend of your
-choice.
+Pargraph can parallelize graph execution on computation backends that may not support it natively.
+Pargraph can function as a scheduler that orchestrates execution of a graph by submitting individual tasks to any given parallel backend.
 
-It implements Dask's `get` API and supports the same task graph format used by Dask making it a drop-in Dask replacement
-for applications that don't need a fully-fledged graph scheduler.
+Pargraph implements Dask's `get` API and supports the same task graph format used by Dask, making it a drop-in Dask replacement for applications that don't need a fully-fledged graph scheduler.
 
 If installed, graph scheduling is powered by [GraphBLAS](https://graphblas.org), a high-performance sparse matrix linear
 algebra library. It allows better scheduling performance for large and complex graphs (e.g. graphs with 100k+ nodes)
