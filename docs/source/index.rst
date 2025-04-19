@@ -8,9 +8,6 @@ Welcome to Pargraph's documentation!
 
 **Pargraph** is a lightweight parallel graph computation library for Python.
 
-At its core, Pargraph consists of two modules: a graph creation tool and an embedded graph scheduler.
-You can use either or both modules in your code.
-
 .. toctree::
    :maxdepth: 2
 

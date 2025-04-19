@@ -6,7 +6,7 @@
   <h3 align="center">Citi/pargraph</h3>
 
   <p align="center">
-    Efficient, lightweight and reliable distributed computation engine.
+    An efficient, light weight, and reliable distributed computation engine.
   </p>
 
   <p align="center">
@@ -25,8 +25,9 @@
 
 <br />
 
-**Pargraph is a lightweight parallel graph computation library for Python**. At its core, Pargraph consists of two
-modules: a graph creation tool and an embedded graph scheduler. You can use either or both modules in your code.
+**Pargraph is a light weight parallel graph computation library for Python**.
+
+Pargraph consists of two modules: a graph creation tool and an embedded graph scheduler. You can use either or both modules in your code.
 
 ## Installation
 
@@ -44,11 +45,12 @@ pip install pargraph[graphblas]
 
 ## Graph creation
 
-Pargraph provides a simple graph creation tool that allows you to build task graphs by decorating Python functions.
+Pargraph provides a simple graph creation tool that allows you to build task graphs by decorating ordinary Python functions.
 
-There are two decorators:
-- `@delayed`: Decorate a function to make it delayed. Cannot contain function calls decorated with `@delayed` or `@graph`.
-- `@graph`: Decorate a function to make it a graph. May contain function calls decorated with `@delayed` or `@graph`.
+Pargraph has two decorators:
+
+- `@delayed`: Decorate a function to make it delayed. Delayed functions are pure, inseperable functions that form the nodes of the computation graph and can be computed in parallel.
+- `@graph`: Make a function in to a graph. These functions may call `@delayed` or other `@graph` functions.
 
 ### Example
 
@@ -82,7 +84,7 @@ def map_reduce_sort(array: np.ndarray, partition_count: int) -> np.ndarray:
     )
 ```
 
-The `map_reduce_sort` function behaves like a normal Python function if called with concrete arguments.
+The `map_reduce_sort()` function behaves like a normal Python function if called with concrete arguments.
 
 ```python
 import numpy as np
@@ -95,7 +97,7 @@ map_reduce_sort(np.random.rand(20))
 #  0.92492478 0.95370363]
 ```
 
-Use the `to_graph` method to generate a graph representation of the function.
+But it can also be turned in to a graph using the `to_graph()` method. Here, we also use `.to_dot()` to generate a visual representation of the graph, and then `.write_png()` to save it to a file. When we call `.to_graph()` we can fix some of the arguments to the function, here we fix the partition count.
 
 ```python
 map_reduce_sort.to_graph(partition_count=4).to_dot().write_png("map_reduce_sort.png")
@@ -103,7 +105,7 @@ map_reduce_sort.to_graph(partition_count=4).to_dot().write_png("map_reduce_sort.
 
 ![Map-Reduce Sort](docs/source/_static/map_reduce_sort.png)
 
-Moreover, you can compose graph functions with other graph functions to generate ever more complex graphs.
+Moreover, you can compose graph functions with other graph functions to generate ever more complex graphs. In this case we have a recursive graph function.
 
 ```python
 @graph
@@ -130,6 +132,7 @@ map_reduce_sort_recursive.to_graph(partition_counts=4).to_dot().write_png("map_r
 
 ![Map-Reduce Sort Recursive](docs/source/_static/map_reduce_sort_recursive.png)
 
+// ?
 Use the `to_dict` method to convert the generated graph to a dict graph.
 
 ```python
@@ -147,20 +150,16 @@ with Client() as client:
 
 ## Graph scheduler
 
-Pargraph brings graph parallelization to parallel backends that may not support it out of the box. Think of it as a mini
-graph scheduler that lives in your program/application and sends out tasks concurrently to a parallel backend of your
-choice.
+Pargraph can parallelize graph execution on computation backends that may not support it natively.
+Pargraph can function as a scheduler that orchestrates execution of a graph by submitting individual tasks to any given parallel backend.
 
-It implements Dask's `get` API and supports the same task graph format used by Dask making it a drop-in Dask replacement
-for applications that don't need a fully-fledged graph scheduler.
+Pargraph implements Dask's `get` API and supports the same task graph format used by Dask, making it a drop-in Dask replacement for applications that don't need a fully-fledged graph scheduler.
 
-If installed, graph scheduling is powered by [GraphBLAS](https://graphblas.org), a high-performance sparse matrix linear
-algebra library. It allows better scheduling performance for large and complex graphs (e.g. graphs with 100k+ nodes)
-compared to native Python implementations.
+If installed, graph scheduling is powered by [GraphBLAS](https://graphblas.org), a high-performance sparse-matrix linear algebra library. It allows for better scheduling performance for large and complex graphs (e.g. graphs with 100k+ nodes) as compared to native Python implementations.
 
 ## Usage
 
-### Initialize graph engine
+### Initialize the graph engine
 
 ```python
 from pargraph import GraphEngine
@@ -170,8 +169,7 @@ graph_engine = GraphEngine()
 
 ### Choose a parallel backend
 
-If you want to use a parallel backend other than the default local multiprocessing backend, you may initialize a
-different parallel backend and pass it into `GraphEngine`'s constructor.
+If you want to use a parallel backend other than the default local multiprocessing backend, you may pass it into `GraphEngine`'s constructor.
 
 #### Example with a dask backend
 
@@ -183,9 +181,9 @@ dask_client = Client(...)
 graph_engine = GraphEngine(ClientExecutor(dask_client))
 ```
 
-You may also implement your own parallel backend by implementing the `submit` method.
-
 #### Example with a custom backend
+
+You may also implement your own parallel backend by creating a class that implements the `submit` method.
 
 ```python
 from concurrent.futures import Future
@@ -197,6 +195,9 @@ class CustomBackend:
 
     def submit(self, fn, /, *args, **kwargs) -> Future:
         future = Future()
+
+        # in a real backend you would submit the function
+        # to a worker thread, a remote machine, etc.
         future.set_result(fn(*args, **kwargs))
         return future
 
@@ -226,7 +227,7 @@ graph = {
 graph_engine.get(graph, "z")  # 12
 ```
 
-You may also compute multiple keys if you like:
+You may also compute multiple keys:
 
 ```python
 graph_engine.get(graph, ["x", "y", "z"])  # [1, 2, 10]
