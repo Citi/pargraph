@@ -155,13 +155,11 @@ Pargraph can function as a scheduler that orchestrates execution of a graph by s
 
 Pargraph implements Dask's `get` API and supports the same task graph format used by Dask, making it a drop-in Dask replacement for applications that don't need a fully-fledged graph scheduler.
 
-If installed, graph scheduling is powered by [GraphBLAS](https://graphblas.org), a high-performance sparse matrix linear
-algebra library. It allows better scheduling performance for large and complex graphs (e.g. graphs with 100k+ nodes)
-compared to native Python implementations.
+If installed, graph scheduling is powered by [GraphBLAS](https://graphblas.org), a high-performance sparse-matrix linear algebra library. It allows for better scheduling performance for large and complex graphs (e.g. graphs with 100k+ nodes) as compared to native Python implementations.
 
 ## Usage
 
-### Initialize graph engine
+### Initialize the graph engine
 
 ```python
 from pargraph import GraphEngine
@@ -171,8 +169,7 @@ graph_engine = GraphEngine()
 
 ### Choose a parallel backend
 
-If you want to use a parallel backend other than the default local multiprocessing backend, you may initialize a
-different parallel backend and pass it into `GraphEngine`'s constructor.
+If you want to use a parallel backend other than the default local multiprocessing backend, you may pass it into `GraphEngine`'s constructor.
 
 #### Example with a dask backend
 
@@ -184,9 +181,9 @@ dask_client = Client(...)
 graph_engine = GraphEngine(ClientExecutor(dask_client))
 ```
 
-You may also implement your own parallel backend by implementing the `submit` method.
-
 #### Example with a custom backend
+
+You may also implement your own parallel backend by creating a class that implements the `submit` method.
 
 ```python
 from concurrent.futures import Future
@@ -198,6 +195,9 @@ class CustomBackend:
 
     def submit(self, fn, /, *args, **kwargs) -> Future:
         future = Future()
+
+        # in a real backend you would submit the function
+        # to a worker thread, a remote machine, etc.
         future.set_result(fn(*args, **kwargs))
         return future
 
@@ -227,7 +227,7 @@ graph = {
 graph_engine.get(graph, "z")  # 12
 ```
 
-You may also compute multiple keys if you like:
+You may also compute multiple keys:
 
 ```python
 graph_engine.get(graph, ["x", "y", "z"])  # [1, 2, 10]
