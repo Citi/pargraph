@@ -6,7 +6,7 @@
   <h3 align="center">Citi/pargraph</h3>
 
   <p align="center">
-    Efficient, lightweight and reliable distributed computation engine.
+    An efficient, light weight, and reliable distributed computation engine.
   </p>
 
   <p align="center">
@@ -25,8 +25,9 @@
 
 <br />
 
-**Pargraph is a lightweight parallel graph computation library for Python**. At its core, Pargraph consists of two
-modules: a graph creation tool and an embedded graph scheduler. You can use either or both modules in your code.
+**Pargraph is a light weight parallel graph computation library for Python**.
+
+Pargraph consists of two modules: a graph creation tool and an embedded graph scheduler. You can use either or both modules in your code.
 
 ## Installation
 
@@ -44,11 +45,12 @@ pip install pargraph[graphblas]
 
 ## Graph creation
 
-Pargraph provides a simple graph creation tool that allows you to build task graphs by decorating Python functions.
+Pargraph provides a simple graph creation tool that allows you to build task graphs by decorating ordinary Python functions.
 
-There are two decorators:
-- `@delayed`: Decorate a function to make it delayed. Cannot contain function calls decorated with `@delayed` or `@graph`.
-- `@graph`: Decorate a function to make it a graph. May contain function calls decorated with `@delayed` or `@graph`.
+Pargraph has two decorators:
+
+- `@delayed`: Decorate a function to make it delayed. Delayed functions are pure, inseperable functions that form the nodes of the computation graph and can be computed in parallel.
+- `@graph`: Make a function in to a graph. These functions may call `@delayed` or other `@graph` functions.
 
 ### Example
 
@@ -82,7 +84,7 @@ def map_reduce_sort(array: np.ndarray, partition_count: int) -> np.ndarray:
     )
 ```
 
-The `map_reduce_sort` function behaves like a normal Python function if called with concrete arguments.
+The `map_reduce_sort()` function behaves like a normal Python function if called with concrete arguments.
 
 ```python
 import numpy as np
@@ -95,7 +97,7 @@ map_reduce_sort(np.random.rand(20))
 #  0.92492478 0.95370363]
 ```
 
-Use the `to_graph` method to generate a graph representation of the function.
+But it can also be turned in to a graph using the `to_graph()` method. Here, we also use `.to_dot()` to generate a visual representation of the graph, and then `.write_png()` to save it to a file. When we call `.to_graph()` we can fix some of the arguments to the function, here we fix the partition count.
 
 ```python
 map_reduce_sort.to_graph(partition_count=4).to_dot().write_png("map_reduce_sort.png")
@@ -103,7 +105,7 @@ map_reduce_sort.to_graph(partition_count=4).to_dot().write_png("map_reduce_sort.
 
 ![Map-Reduce Sort](docs/source/_static/map_reduce_sort.png)
 
-Moreover, you can compose graph functions with other graph functions to generate ever more complex graphs.
+Moreover, you can compose graph functions with other graph functions to generate ever more complex graphs. In this case we have a recursive graph function.
 
 ```python
 @graph
