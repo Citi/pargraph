@@ -97,7 +97,9 @@ map_reduce_sort(np.random.rand(20))
 #  0.92492478 0.95370363]
 ```
 
-But it can also be turned in to a graph using the `to_graph()` method. Here, we also use `.to_dot()` to generate a visual representation of the graph, and then `.write_png()` to save it to a file. When we call `.to_graph()` we can fix some of the arguments to the function, here we fix the partition count.
+But it can also be turned in to a graph using the `to_graph()` method. Here, we also use `.to_dot()` to generate a visual representation of the graph, and then `.write_png()` to save it to a file.
+
+When we call `.to_graph()` we must provide arguments to the function that affect the topology of the graph. Here, `partition_count` will determine the number of times `sort_array()` and `filter_array()` are called, and thus affects the shape of the graph, therefore it must be provided when creating the graph. Any remaining arguments will be provided later when the graph is evaluated.
 
 ```python
 map_reduce_sort.to_graph(partition_count=4).to_dot().write_png("map_reduce_sort.png")
@@ -134,6 +136,7 @@ map_reduce_sort_recursive.to_graph(partition_counts=4).to_dot().write_png("map_r
 
 Use the `to_dict()` method to convert the generated graph to a [task graph](https://docs.dask.org/en/latest/graphs.html).
 
+When the task graph is created, all parameters must be known. Those which affect the shape of the graph are provided in `to_graph()`, and we must provide the remainder to `to_dict()`. We are then yielded the task represented as a dictionary representing the computation, with argument values embedded.
 
 ```python
 import numpy as np
