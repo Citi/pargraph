@@ -6,7 +6,7 @@
   <h3 align="center">Citi/pargraph</h3>
 
   <p align="center">
-    An efficient, light weight, and reliable distributed computation engine.
+    An efficient, lightweight, and reliable distributed computation engine.
   </p>
 
   <p align="center">
@@ -25,7 +25,7 @@
 
 <br />
 
-**Pargraph is a light weight parallel graph computation library for Python**.
+**Pargraph is a lightweight parallel graph computation library for Python**.
 
 Pargraph consists of two modules: a graph creation tool and an embedded graph scheduler. You can use either or both modules in your code.
 
