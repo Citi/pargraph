@@ -132,8 +132,8 @@ map_reduce_sort_recursive.to_graph(partition_counts=4).to_dot().write_png("map_r
 
 ![Map-Reduce Sort Recursive](docs/source/_static/map_reduce_sort_recursive.png)
 
-// ?
-Use the `to_dict` method to convert the generated graph to a dict graph.
+Use the `to_dict()` method to convert the generated graph to a [task graph](https://docs.dask.org/en/latest/graphs.html).
+
 
 ```python
 import numpy as np
