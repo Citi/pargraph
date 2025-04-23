@@ -136,7 +136,7 @@ map_reduce_sort_recursive.to_graph(partition_counts=4).to_dot().write_png("map_r
 
 Use the `to_dict()` method to convert the generated graph to a [task graph](https://docs.dask.org/en/latest/graphs.html).
 
-When the task graph is created, all parameters must be known. Those which affect the shape of the graph are provided in `to_graph()`, and we must provide the remainder to `to_dict()`. We are then yielded the task represented as a dictionary representing the computation, with argument values embedded.
+When the task graph is created, all parameters must be known. Those which affect the shape of the graph are provided during graph creation to `to_graph()`, and we must provide the remaining arguments to `to_dict()`, except when parameters have defaults in which case they may be omitted. We are then yielded the task represented as a dictionary representing the computation, with argument values embedded.
 
 ```python
 import numpy as np
