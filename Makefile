@@ -10,7 +10,7 @@ doc:
 
 _doc: requirements.txt
 	rm -fr docsvenv build; mkdir build
-	python3.8 -m venv docsvenv
+	python3.10 -m venv docsvenv
 	. docsvenv/bin/activate; \
 		pip install -r docs/requirements.txt; \
 		pip install -r requirements.txt; \

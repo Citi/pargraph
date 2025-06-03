@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "pargraph"
 description = "Distributed graph computation library"
-requires-python = ">=3.8"
+requires-python = ">=3.10"
 readme = { file = "README.md", content-type = "text/markdown" }
 license = { text = "Apache 2.0" }
 authors = [{ name = "Citi", email = "opensource@citi.com" }]
@@ -22,7 +22,7 @@ dynamic = ["dependencies", "version"]
 Home = "https://github.com/Citi/pargraph"
 
 [project.optional-dependencies]
-graphblas = ["python-graphblas", "numpy"]
+graphblas = ["python-graphblas", "numpy==2.2.6"]
 
 [tool.setuptools]
 packages = ["pargraph"]
