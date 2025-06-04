@@ -1,11 +1,6 @@
 import inspect
 import sys
-from typing import Callable, Tuple, Union
-
-if sys.version_info < (3, 9):
-    from typing_extensions import Annotated, get_args, get_origin
-else:
-    from typing import Annotated, get_args, get_origin
+from typing import Annotated, Callable, Tuple, Union, get_args, get_origin
 
 
 class Result:
