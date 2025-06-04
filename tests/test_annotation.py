@@ -1,13 +1,7 @@
-import sys
 import unittest
-from typing import Tuple
+from typing import Annotated, Tuple
 
 from pargraph.graph.annotation import Result, _get_output_names
-
-if sys.version_info < (3, 9):
-    from typing_extensions import Annotated
-else:
-    from typing import Annotated
 
 
 class TestAnnotation(unittest.TestCase):
