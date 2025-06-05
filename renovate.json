@@ -3,6 +3,7 @@
   "extends": [
     "config:recommended"
   ],
+  "branchPrefix": "renovate/",
   "automergeType": "pr",
   "automergeStrategy": "squash",
   "recreateWhen": "auto",
@@ -11,6 +12,12 @@
       "description": "Automerge latest patch versions",
       "matchUpdateTypes": ["patch"],
       "automerge": true
+    },
+    {
+      "description": "Do not automerge Python versions",
+      "matchPackageNames": ["python", "python3"],
+      "matchUpdateTypes": ["major", "minor", "patch"],
+      "automerge": false
     }
   ]
 }
