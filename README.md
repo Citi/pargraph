@@ -1,15 +1,18 @@
 <div align="center">
-  <a href="https://github.com/citi">
-    <img src="https://github.com/citi.png" alt="Citi" width="80" height="80">
+  <a href="https://github.com/finos">
+    <img src="https://github.com/finos.png" alt="FINOS" width="80" height="80">
   </a>
 
-  <h3 align="center">Citi/pargraph</h3>
+  <h3 align="center">OpenGRIS Pargraph</h3>
 
   <p align="center">
     An efficient, lightweight, and reliable distributed computation engine.
   </p>
 
   <p align="center">
+    <a href="https://community.finos.org/docs/governance/Software-Projects/stages/incubating">
+      <img src="https://cdn.jsdelivr.net/gh/finos/contrib-toolbox@master/images/badge-incubating.svg">
+    </a>
     <a href="https://citi.github.io/pargraph/">
       <img src="https://img.shields.io/badge/Documentation-0f1632">
     </a>
@@ -25,7 +28,7 @@
 
 <br />
 
-**Pargraph is a lightweight parallel graph computation library for Python**.
+**OpenGRIS Pargraph is a lightweight parallel graph computation library for Python**.
 
 Pargraph consists of two modules: a graph creation tool and an embedded graph scheduler. You can use either or both modules in your code.
 
@@ -243,22 +246,29 @@ Your contributions are at the core of making this a true open source project. An
 We welcome you to:
 
 - Fix typos or touch up documentation
-- Share your opinions on [existing issues](https://github.com/citi/pargraph/issues)
-- Help expand and improve our library by [opening a new issue](https://github.com/citi/pargraph/issues/new)
+- Share your opinions on [existing issues](https://github.com/finos/opengris-pargraph/issues)
+- Help expand and improve our library by [opening a new issue](https://github.com/finos/opengris-pargraph/issues/new)
 
 Please review our [community contribution guidelines](https://github.com/Citi/.github/blob/main/CONTRIBUTING.md) and
 [functional contribution guidelines](./CONTRIBUTING.md) to get started 👍.
 
+_NOTE:_ Commits and pull requests to FINOS repositories will only be accepted from those contributors with an active, executed Individual Contributor License Agreement (ICLA) with FINOS OR contributors who are covered under an existing and active Corporate Contribution License Agreement (CCLA) executed with FINOS. Commits from individuals not covered under an ICLA or CCLA will be flagged and blocked by the ([EasyCLA](https://community.finos.org/docs/governance/Software-Projects/easycla)) tool. Please note that some CCLAs require individuals/employees to be explicitly named on the CCLA.
+
+*Need an ICLA? Unsure if you are covered under an existing CCLA? Email [help@finos.org](mailto:help@finos.org)*
+
 ## Code of Conduct
 
-We are committed to making open source an enjoyable and respectful experience for our community. See
-[`CODE_OF_CONDUCT`](https://github.com/Citi/.github/blob/main/CODE_OF_CONDUCT.md) for more information.
+Please see the FINOS [Community Code of Conduct](https://www.finos.org/code-of-conduct).
 
 ## License
+
+Copyright 2023 Citigroup, Inc.
 
 This project is distributed under the [Apache-2.0 License](https://www.apache.org/licenses/LICENSE-2.0). See
 [`LICENSE`](./LICENSE) for more information.
 
+SPDX-License-Identifier: [Apache-2.0](https://spdx.org/licenses/Apache-2.0).
+
 ## Contact
 
-If you have a query or require support with this project, [raise an issue](https://github.com/Citi/pargraph/issues). Otherwise, reach out to [opensource@citi.com](mailto:opensource@citi.com).
+If you have a query or require support with this project, [raise an issue](https://github.com/finos/opengris-pargraph/issues). Otherwise, reach out to [opensource@citi.com](mailto:opensource@citi.com).
