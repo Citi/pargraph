@@ -249,8 +249,7 @@ We welcome you to:
 - Share your opinions on [existing issues](https://github.com/finos/opengris-pargraph/issues)
 - Help expand and improve our library by [opening a new issue](https://github.com/finos/opengris-pargraph/issues/new)
 
-Please review our [community contribution guidelines](https://github.com/Citi/.github/blob/main/CONTRIBUTING.md) and
-[functional contribution guidelines](./CONTRIBUTING.md) to get started 👍.
+Please review [functional contribution guidelines](./CONTRIBUTING.md) to get started 👍.
 
 _NOTE:_ Commits and pull requests to FINOS repositories will only be accepted from those contributors with an active, executed Individual Contributor License Agreement (ICLA) with FINOS OR contributors who are covered under an existing and active Corporate Contribution License Agreement (CCLA) executed with FINOS. Commits from individuals not covered under an ICLA or CCLA will be flagged and blocked by the ([EasyCLA](https://community.finos.org/docs/governance/Software-Projects/easycla)) tool. Please note that some CCLAs require individuals/employees to be explicitly named on the CCLA.
 
