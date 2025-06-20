@@ -1,9 +1,7 @@
 <div align="center">
-  <a href="https://github.com/finos">
-    <img src="https://github.com/finos.png" alt="FINOS" width="80" height="80">
+  <a href="https://github.com/finos/opengris-pargraph">
+    <img src="https://github.com/finos/branding/blob/master/project-logos/active-project-logos/OpenGRIS/Pargraph/2025_OpenGRIS_Pargraph.svg" alt="OpenGRIS Pargraph" width="180" height="80">
   </a>
-
-  <h3 align="center">OpenGRIS Pargraph</h3>
 
   <p align="center">
     An efficient, lightweight, and reliable distributed computation engine.
