@@ -11,7 +11,7 @@
     <a href="https://community.finos.org/docs/governance/Software-Projects/stages/incubating">
       <img src="https://cdn.jsdelivr.net/gh/finos/contrib-toolbox@master/images/badge-incubating.svg">
     </a>
-    <a href="https://citi.github.io/pargraph/">
+    <a href="https://finos.github.io/opengris-pargraph/">
       <img src="https://img.shields.io/badge/Documentation-0f1632">
     </a>
     <a href="./LICENSE">
